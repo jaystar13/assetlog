@@ -1,0 +1,41 @@
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── IDE ──
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+
+# ── Claude Code ──
+.claude/
+
+# ── Flutter / Dart (app/) ──
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/ios/.symlinks/
+**/.generated_plugin_registrant.dart
+*.class
+*.log
+
+# ── Node / NestJS (api/ 예정) ──
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# ── 기타 ──
+*.pyc
+coverage/
