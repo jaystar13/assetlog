@@ -13,6 +13,8 @@ import '../design_system/components/al_input.dart';
 import '../design_system/components/al_stat_row.dart';
 import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_section_header.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/user_preferences.dart';
@@ -30,32 +32,9 @@ class _HomeScreenState extends State<HomeScreen>
   late final Animation<double> _goalAnim;
 
   final _prefs = UserPreferences();
-
-  // --- Dummy data ---
-  final int goalStartAmount = 1500000000; // 목표 출발 금액 (15억)
-  final int goalAmount = 3000000000;
-  final String goalDeadline = '2030-12-31';
-  final int currentNetWorth = 2160000000;
-  final int totalAssets = 2580000000;
-  final int totalDebts = 420000000;
-  final int lastMonthNetWorth = 2100000000;
-  final int monthlyIncome = 5350000;
-  final int monthlyExpense = 3420000;
-  final String currentMonth = '3월';
-
-  // 공유받은 자산 더미 데이터
-  final List<Map<String, dynamic>> _sharedAssets = [
-    {
-      'ownerName': '홍아버지',
-      'ownerAvatar': '👨‍🦳',
-      'ownerEmail': 'dad@example.com',
-      'permissions': '수입/지출: 편집 · 자산: 부동산, 주식 편집 가능',
-      'totalAssets': 3250000000,
-      'totalDebt': 180000000,
-      'netWorth': 3070000000,
-      'lastUpdated': '2026-03-25',
-    },
-  ];
+  final _repo = HomeRepository();
+  late final List<SharedAssetInfo> _sharedAssets;
+  late final List<DailyQuote> _quotes;
 
   // Goal setting controllers
   final _goalStartController = TextEditingController();
@@ -65,6 +44,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    _sharedAssets = _repo.getSharedAssets();
+    _quotes = _repo.getQuotes();
     _prefs.addListener(_onPrefsChanged);
 
     // 목표 달성률 애니메이션
@@ -95,42 +76,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (mounted) setState(() {});
   }
 
-  // ── 일일 격언 ──
-  static const _quotes = [
-    {'text': '부는 쓰는 것을 아끼는 데서 시작된다.', 'author': '키케로'},
-    {'text': '돈을 모으는 것은 나무를 심는 것과 같다. 시간이 최고의 비료다.', 'author': '워런 버핏'},
-    {'text': '작은 지출을 조심하라. 작은 구멍이 큰 배를 침몰시킨다.', 'author': '벤자민 프랭클린'},
-    {'text': '부자가 되는 비결은 내일 할 일을 오늘 하고, 오늘 먹을 것을 내일 먹는 것이다.', 'author': '마크 트웨인'},
-    {'text': '투자의 첫 번째 규칙은 돈을 잃지 않는 것이고, 두 번째 규칙은 첫 번째 규칙을 잊지 않는 것이다.', 'author': '워런 버핏'},
-    {'text': '저축은 미래의 나에게 보내는 선물이다.', 'author': '작자 미상'},
-    {'text': '복리는 세계 8번째 불가사의다. 이해하는 자는 벌고, 모르는 자는 지불한다.', 'author': '알베르트 아인슈타인'},
-    {'text': '재정적 자유는 사치가 아니라 선택의 자유다.', 'author': '로버트 기요사키'},
-    {'text': '수입의 일부를 먼저 저축하라. 스스로에게 먼저 지불하라.', 'author': '조지 클레이슨'},
-    {'text': '돈은 좋은 하인이지만 나쁜 주인이다.', 'author': '프랜시스 베이컨'},
-    {'text': '기회는 준비된 자에게 온다. 오늘의 기록이 내일의 부를 만든다.', 'author': '루이 파스퇴르'},
-    {'text': '시작이 반이다. 오늘 한 걸음이 내일의 자산이 된다.', 'author': '아리스토텔레스'},
-    {'text': '부를 쌓는 것은 마라톤이지 단거리 경주가 아니다.', 'author': '데이브 램지'},
-    {'text': '당신이 잠자는 동안에도 돈이 일하게 하라.', 'author': '워런 버핏'},
-    {'text': '목표 없는 항해에 순풍은 없다.', 'author': '세네카'},
-    {'text': '지출을 줄이는 것은 수입을 늘리는 것만큼 가치 있다.', 'author': '토머스 풀러'},
-    {'text': '오늘의 결정이 10년 후의 나를 만든다.', 'author': '작자 미상'},
-    {'text': '꾸준함은 재능을 이긴다. 매일 조금씩이 기적을 만든다.', 'author': '작자 미상'},
-    {'text': '가장 좋은 투자는 자기 자신에 대한 투자다.', 'author': '워런 버핏'},
-    {'text': '부자는 돈을 관리하고, 가난한 자는 돈에 관리당한다.', 'author': 'T. 하브 에커'},
-    {'text': '현명한 사람은 돈을 벌면 먼저 저축하고 나머지로 생활한다.', 'author': '짐 론'},
-    {'text': '경제적 독립은 자유로운 삶의 초석이다.', 'author': '작자 미상'},
-    {'text': '지금 시작하지 않으면 1년 후에도 같은 자리에 있을 것이다.', 'author': '카렌 램'},
-    {'text': '부의 축적에서 가장 강력한 힘은 시간과 인내다.', 'author': '찰리 멍거'},
-    {'text': '재산을 지키는 것은 재산을 모으는 것보다 더 어렵다.', 'author': '오비디우스'},
-    {'text': '위험을 감수하지 않는 것이 가장 큰 위험이다.', 'author': '마크 저커버그'},
-    {'text': '성공은 매일 반복하는 작은 노력의 합이다.', 'author': '로버트 콜리어'},
-    {'text': '절약은 큰 수입이다.', 'author': '키케로'},
-    {'text': '당신의 순자산은 자존감이 아니다. 하지만 관리할 가치는 있다.', 'author': '수지 오먼'},
-    {'text': '미래는 오늘 우리가 무엇을 하느냐에 달려 있다.', 'author': '마하트마 간디'},
-    {'text': '부는 능력이 아니라 습관에서 온다.', 'author': '작자 미상'},
-  ];
-
-  Map<String, String> get _todayQuote {
+  DailyQuote get _todayQuote {
     final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
     return _quotes[dayOfYear % _quotes.length];
   }
@@ -166,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  quote['text']!,
+                  quote.text,
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.gray800,
                     height: 1.5,
@@ -174,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 SizedBox(height: AppSpacing.sm),
                 Text(
-                  '— ${quote['author']}',
+                  '— ${quote.author}',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.emerald600,
                     fontStyle: FontStyle.italic,
@@ -225,22 +171,22 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   double get goalPercent =>
-      goalAmount > 0 ? (currentNetWorth / goalAmount * 100).clamp(0, 100) : 0;
+      _repo.goalAmount > 0 ? (_repo.currentNetWorth / _repo.goalAmount * 100).clamp(0, 100) : 0;
 
   double get netWorthChangePercent {
-    if (lastMonthNetWorth == 0) return 0;
-    return (currentNetWorth - lastMonthNetWorth) / lastMonthNetWorth * 100;
+    if (_repo.lastMonthNetWorth == 0) return 0;
+    return (_repo.currentNetWorth - _repo.lastMonthNetWorth) / _repo.lastMonthNetWorth * 100;
   }
 
-  int get netWorthGrowth => currentNetWorth - lastMonthNetWorth;
+  int get netWorthGrowth => _repo.currentNetWorth - _repo.lastMonthNetWorth;
 
   double get cashFlowRatio =>
-      monthlyIncome > 0 ? monthlyExpense / monthlyIncome : 0;
+      _repo.monthlyIncome > 0 ? _repo.monthlyExpense / _repo.monthlyIncome : 0;
 
   void _showGoalSettingSheet() {
-    _goalStartController.text = goalStartAmount.toString();
-    _goalAmountController.text = goalAmount.toString();
-    _goalDeadlineController.text = goalDeadline;
+    _goalStartController.text = _repo.goalStartAmount.toString();
+    _goalAmountController.text = _repo.goalAmount.toString();
+    _goalDeadlineController.text = _repo.goalDeadline;
 
     AlBottomSheet.show(
       context: context,
@@ -420,9 +366,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   // === Goal Visualizer Card ===
   Widget _buildGoalVisualizerCard() {
-    final remaining = goalAmount - currentNetWorth;
-    final range = goalAmount - goalStartAmount;
-    final progress = currentNetWorth - goalStartAmount;
+    final remaining = _repo.goalAmount - _repo.currentNetWorth;
+    final range = _repo.goalAmount - _repo.goalStartAmount;
+    final progress = _repo.currentNetWorth - _repo.goalStartAmount;
     final fraction = range > 0
         ? (progress / range).clamp(0.0, 1.0)
         : 0.0;
@@ -466,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   Text('시작', style: AppTypography.caption),
                                 ],
                               ),
-                              Text(formatKoreanWon(goalStartAmount), style: AppTypography.bodySmall.copyWith(
+                              Text(formatKoreanWon(_repo.goalStartAmount), style: AppTypography.bodySmall.copyWith(
                                 fontWeight: FontWeight.w600,
                               )),
                             ],
@@ -489,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   )),
                                 ],
                               ),
-                              Text(formatKoreanWon(goalAmount), style: AppTypography.bodySmall.copyWith(
+                              Text(formatKoreanWon(_repo.goalAmount), style: AppTypography.bodySmall.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.emerald600,
                               )),
@@ -589,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       SizedBox(width: AppSpacing.sm),
                       Text(
-                        formatKoreanWon(currentNetWorth),
+                        formatKoreanWon(_repo.currentNetWorth),
                         style: AppTypography.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -634,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen>
           // 기한 표시
           Center(
             child: Text(
-              '목표 기한: $goalDeadline',
+              '목표 기한: ${_repo.goalDeadline}',
               style: AppTypography.caption,
             ),
           ),
@@ -655,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatKoreanWon(currentNetWorth),
+                formatKoreanWon(_repo.currentNetWorth),
                 style: AppTypography.amountLarge,
               ),
               SizedBox(width: AppSpacing.sm),
@@ -671,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen>
           AlStatRow(
             dotColor: AppColors.blue600,
             label: '총 자산',
-            value: formatKoreanWon(totalAssets),
+            value: formatKoreanWon(_repo.totalAssets),
             valueColor: AppColors.blue600,
             backgroundColor: AppColors.blue50,
           ),
@@ -679,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen>
           AlStatRow(
             dotColor: AppColors.red600,
             label: '총 부채',
-            value: formatKoreanWon(totalDebts),
+            value: formatKoreanWon(_repo.totalDebts),
             valueColor: AppColors.red600,
             backgroundColor: AppColors.red50,
           ),
@@ -744,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AlSectionHeader(
-            title: '$currentMonth 현금 흐름',
+            title: '${_repo.currentMonth} 현금 흐름',
             actionLabel: '상세보기',
             onAction: () => context.go('/cashflow'),
           ),
@@ -758,7 +704,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text('수입', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(monthlyIncome),
+                      formatKoreanWon(_repo.monthlyIncome),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.emerald600,
                       ),
@@ -773,7 +719,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text('지출', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(monthlyExpense),
+                      formatKoreanWon(_repo.monthlyExpense),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.red600,
                       ),
@@ -843,10 +789,10 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSharedAssetCard(Map<String, dynamic> shared) {
-    final totalAssets = shared['totalAssets'] as int;
-    final totalDebt = shared['totalDebt'] as int;
-    final netWorth = shared['netWorth'] as int;
+  Widget _buildSharedAssetCard(SharedAssetInfo shared) {
+    final totalAssets = shared.totalAssets;
+    final totalDebt = shared.totalDebt;
+    final netWorth = shared.netWorth;
 
     return AlCard(
       child: Column(
@@ -856,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen>
           Row(
             children: [
               AlAvatar.medium(
-                text: shared['ownerAvatar'] as String,
+                text: shared.ownerAvatar,
                 gradientColors: [AppColors.emerald400, AppColors.teal500],
               ),
               SizedBox(width: AppSpacing.md),
@@ -865,12 +811,12 @@ class _HomeScreenState extends State<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${shared['ownerName']}님의 자산',
+                      '${shared.ownerName}님의 자산',
                       style: AppTypography.label,
                     ),
                     SizedBox(height: 2),
                     Text(
-                      '${shared['lastUpdated']} 업데이트',
+                      '${shared.lastUpdated} 업데이트',
                       style: AppTypography.caption,
                     ),
                   ],
@@ -916,7 +862,7 @@ class _HomeScreenState extends State<HomeScreen>
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    shared['permissions'] as String,
+                    shared.permissions,
                     style: AppTypography.caption.copyWith(
                       color: AppColors.emerald700,
                     ),

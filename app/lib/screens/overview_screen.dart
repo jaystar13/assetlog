@@ -8,116 +8,9 @@ import '../design_system/components/al_card.dart';
 import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_section_header.dart';
 import '../design_system/components/al_screen_header.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
-
-// ---------------------------------------------------------------------------
-// Data model
-// ---------------------------------------------------------------------------
-
-class _MonthlyData {
-  final String month;
-  final double income;
-  final double expense;
-  final double netCashFlow;
-  final double netWorth;
-  final double savingsRate;
-  final double realEstate; // 부동산
-  final double stocks; // 주식투자
-  final double cash; // 현금예금
-  final double debt; // 대출부채
-
-  const _MonthlyData({
-    required this.month,
-    required this.income,
-    required this.expense,
-    required this.netCashFlow,
-    required this.netWorth,
-    required this.savingsRate,
-    required this.realEstate,
-    required this.stocks,
-    required this.cash,
-    required this.debt,
-  });
-}
-
-const _kDummyData = <_MonthlyData>[
-  _MonthlyData(
-    month: '2025-10',
-    income: 530,
-    expense: 310,
-    netCashFlow: 220,
-    netWorth: 2002,
-    savingsRate: 41.5,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 912,
-    debt: 410,
-  ),
-  _MonthlyData(
-    month: '2025-11',
-    income: 545,
-    expense: 325,
-    netCashFlow: 220,
-    netWorth: 2034,
-    savingsRate: 40.4,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 938,
-    debt: 404,
-  ),
-  _MonthlyData(
-    month: '2025-12',
-    income: 620,
-    expense: 410,
-    netCashFlow: 210,
-    netWorth: 2045,
-    savingsRate: 33.9,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 945,
-    debt: 400,
-  ),
-  _MonthlyData(
-    month: '2026-01',
-    income: 535,
-    expense: 328,
-    netCashFlow: 207,
-    netWorth: 2054,
-    savingsRate: 38.7,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 952,
-    debt: 398,
-  ),
-  _MonthlyData(
-    month: '2026-02',
-    income: 540,
-    expense: 332,
-    netCashFlow: 208,
-    netWorth: 2063,
-    savingsRate: 38.5,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 961,
-    debt: 398,
-  ),
-  _MonthlyData(
-    month: '2026-03',
-    income: 535,
-    expense: 342,
-    netCashFlow: 193,
-    netWorth: 2098,
-    savingsRate: 36.1,
-    realEstate: 1000,
-    stocks: 500,
-    cash: 988,
-    debt: 390,
-  ),
-];
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
 
 class OverviewScreen extends StatefulWidget {
   const OverviewScreen({super.key});
@@ -127,15 +20,16 @@ class OverviewScreen extends StatefulWidget {
 }
 
 class _OverviewScreenState extends State<OverviewScreen> {
-  String _selectedPeriod = '6m';
+  final _allData = OverviewRepository().getMonthlyData();
+  PeriodFilter _selectedPeriod = PeriodFilter.sixMonths;
 
-  List<_MonthlyData> get _data {
-    if (_selectedPeriod == '6m') {
-      return _kDummyData.length > 6
-          ? _kDummyData.sublist(_kDummyData.length - 6)
-          : _kDummyData;
+  List<MonthlyData> get _data {
+    if (_selectedPeriod == PeriodFilter.sixMonths) {
+      return _allData.length > 6
+          ? _allData.sublist(_allData.length - 6)
+          : _allData;
     }
-    return _kDummyData;
+    return _allData;
   }
 
   // -----------------------------------------------------------------------
@@ -209,17 +103,17 @@ class _OverviewScreenState extends State<OverviewScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        _periodButton('6m', '6개월'),
+        _periodButton(PeriodFilter.sixMonths),
         SizedBox(width: AppSpacing.sm),
-        _periodButton('12m', '12개월'),
+        _periodButton(PeriodFilter.twelveMonths),
       ],
     );
   }
 
-  Widget _periodButton(String value, String label) {
-    final isSelected = _selectedPeriod == value;
+  Widget _periodButton(PeriodFilter filter) {
+    final isSelected = _selectedPeriod == filter;
     return GestureDetector(
-      onTap: () => setState(() => _selectedPeriod = value),
+      onTap: () => setState(() => _selectedPeriod = filter),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
@@ -230,7 +124,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
           borderRadius: AppRadius.fullAll,
         ),
         child: Text(
-          label,
+          filter.label,
           style: AppTypography.labelSmall.copyWith(
             color: isSelected ? Colors.white : AppColors.gray600,
           ),

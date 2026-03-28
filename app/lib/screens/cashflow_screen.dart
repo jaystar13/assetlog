@@ -12,6 +12,8 @@ import '../design_system/components/al_input.dart';
 import '../design_system/components/al_badge.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 
@@ -23,125 +25,52 @@ class CashFlowScreen extends StatefulWidget {
 }
 
 class _CashFlowScreenState extends State<CashFlowScreen> {
+  final _repo = CashflowRepository();
   DateTime _selectedMonth = DateTime(2026, 3);
 
-  // 거래 내역 필터: null=전체, 'income'=수입, 'expense'=지출
-  String? _txFilter;
+  // 거래 내역 필터
+  TransactionType? _txFilter;
 
-  List<Map<String, dynamic>> get _filteredTransactions =>
+  late final List<Transaction> _transactions;
+  late final List<Transaction> _lastMonthTransactions;
+  late final int _lastMonthIncome;
+  late final int _lastMonthExpense;
+  late final List<CardCompany> _cardCompanies;
+
+  @override
+  void initState() {
+    super.initState();
+    _transactions = _repo.getTransactions();
+    _lastMonthTransactions = _repo.getLastMonthTransactions();
+    _lastMonthIncome = _repo.getLastMonthIncome();
+    _lastMonthExpense = _repo.getLastMonthExpense();
+    _cardCompanies = _repo.getCardCompanies();
+  }
+
+  List<Transaction> get _filteredTransactions =>
       _txFilter == null
           ? _transactions
-          : _transactions.where((t) => t['type'] == _txFilter).toList();
-
-  final List<Map<String, dynamic>> _transactions = [
-    {
-      'id': '1',
-      'type': 'income',
-      'name': '월급',
-      'amount': 5000000,
-      'date': '2026-03-01',
-      'category': 'Salary',
-      'subCategory': '직장 급여',
-      'editedBy': '나',
-    },
-    {
-      'id': '2',
-      'type': 'expense',
-      'name': '식료품 쇼핑',
-      'amount': 250000,
-      'date': '2026-03-05',
-      'category': 'Essential',
-      'subCategory': 'Groceries',
-      'editedBy': '김영수',
-    },
-    {
-      'id': '3',
-      'type': 'expense',
-      'name': '레스토랑',
-      'amount': 120000,
-      'date': '2026-03-10',
-      'category': 'Optional',
-      'subCategory': 'Dining Out',
-      'editedBy': '나',
-    },
-    {
-      'id': '4',
-      'type': 'income',
-      'name': '배당금',
-      'amount': 350000,
-      'date': '2026-03-12',
-      'category': 'Financial',
-      'subCategory': '투자 수익',
-      'editedBy': '박지현',
-    },
-    {
-      'id': '5',
-      'type': 'expense',
-      'name': '전기세',
-      'amount': 85000,
-      'date': '2026-03-14',
-      'category': 'Living',
-      'subCategory': 'Utilities',
-      'editedBy': '나',
-    },
-  ];
-
-  // 지난달 거래 더미 데이터 (항목명+카테고리+세부카테고리 일치 시 동일 거래로 비교)
-  static const List<Map<String, dynamic>> _lastMonthTransactions = [
-    {
-      'type': 'income',
-      'name': '월급',
-      'amount': 4800000,
-      'category': 'Salary',
-      'subCategory': '직장 급여',
-    },
-    {
-      'type': 'expense',
-      'name': '식료품 쇼핑',
-      'amount': 230000,
-      'category': 'Essential',
-      'subCategory': 'Groceries',
-    },
-    {
-      'type': 'expense',
-      'name': '레스토랑',
-      'amount': 150000,
-      'category': 'Optional',
-      'subCategory': 'Dining Out',
-    },
-    {
-      'type': 'expense',
-      'name': '전기세',
-      'amount': 92000,
-      'category': 'Living',
-      'subCategory': 'Utilities',
-    },
-  ];
+          : _transactions.where((t) => t.type == _txFilter).toList();
 
   /// 항목명+카테고리+세부카테고리로 전월 매칭 거래를 찾는다.
-  /// 매칭되는 거래가 없으면 null (신규 거래).
-  Map<String, dynamic>? _findLastMonthMatch(Map<String, dynamic> tx) {
+  Transaction? _findLastMonthMatch(Transaction tx) {
     for (final prev in _lastMonthTransactions) {
-      if (prev['name'] == tx['name'] &&
-          prev['category'] == tx['category'] &&
-          prev['subCategory'] == tx['subCategory']) {
+      if (prev.name == tx.name &&
+          prev.category == tx.category &&
+          prev.subCategory == tx.subCategory) {
         return prev;
       }
     }
     return null;
   }
 
-  // 지난달 더미 데이터 (전월 대비 비교용 — 월간 요약)
-  static const int _lastMonthIncome = 4800000;
-  static const int _lastMonthExpense = 3900000;
-
   int get _totalIncome => _transactions
-      .where((t) => t['type'] == 'income')
-      .fold(0, (sum, t) => sum + (t['amount'] as int));
+      .where((t) => t.type == TransactionType.income)
+      .fold(0, (sum, t) => sum + t.amount);
 
   int get _totalExpense => _transactions
-      .where((t) => t['type'] == 'expense')
-      .fold(0, (sum, t) => sum + (t['amount'] as int));
+      .where((t) => t.type == TransactionType.expense)
+      .fold(0, (sum, t) => sum + t.amount);
 
   int get _balance => _totalIncome - _totalExpense;
 
@@ -182,7 +111,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       child: _ManualEntryForm(
         onSubmit: (entry) {
           setState(() {
-            _transactions.add(entry);
+            _transactions.add(Transaction.fromMap(entry));
           });
           Navigator.of(context).pop();
           showSuccessSnackBar(context, '거래가 추가되었습니다');
@@ -191,17 +120,17 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  void _showEditEntrySheet(Map<String, dynamic> tx) {
+  void _showEditEntrySheet(Transaction tx) {
     AlBottomSheet.show(
       context: context,
       title: '거래 수정',
       child: _ManualEntryForm(
-        initialData: tx,
+        initialData: tx.toMap(),
         onSubmit: (updated) {
           setState(() {
-            final index = _transactions.indexWhere((t) => t['id'] == updated['id']);
+            final index = _transactions.indexWhere((t) => t.id == updated['id']);
             if (index != -1) {
-              _transactions[index] = updated;
+              _transactions[index] = Transaction.fromMap(updated);
             }
           });
           Navigator.of(context).pop();
@@ -211,16 +140,16 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  void _showDeleteConfirmDialog(Map<String, dynamic> tx) {
+  void _showDeleteConfirmDialog(Transaction tx) {
     AlConfirmDialog.show(
       context: context,
       title: '거래 삭제',
-      message: "'${tx['name']}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+      message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
       onConfirm: () {
         setState(() {
-          _transactions.removeWhere((t) => t['id'] == tx['id']);
+          _transactions.removeWhere((t) => t.id == tx.id);
         });
-        showSuccessSnackBar(context, "'${tx['name']}' 항목이 삭제되었습니다");
+        showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
       },
     );
   }
@@ -293,7 +222,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
   }
 
   Widget _buildTxFilterSegment() {
-    Widget segment(String? value, String label) {
+    Widget segment(TransactionType? value, String label) {
       final isSelected = _txFilter == value;
       return GestureDetector(
         onTap: () => setState(() => _txFilter = value),
@@ -326,8 +255,8 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           segment(null, '전체'),
-          segment('income', '수입'),
-          segment('expense', '지출'),
+          segment(TransactionType.income, '수입'),
+          segment(TransactionType.expense, '지출'),
         ],
       ),
     );
@@ -484,19 +413,6 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  // ── 카드사 목록 (enabled: 구현 완료 여부) ──
-  static const _cardCompanies = [
-    {'id': 'shinhan', 'name': '신한카드', 'format': 'Excel(.xls)', 'enabled': true},
-    {'id': 'kb', 'name': 'KB국민카드', 'format': 'Excel(.xlsx)', 'enabled': true},
-    {'id': 'hyundai', 'name': '현대카드', 'format': 'Excel(.xlsx)', 'enabled': false},
-    {'id': 'samsung', 'name': '삼성카드', 'format': 'Excel(.xls)', 'enabled': false},
-    {'id': 'lotte', 'name': '롯데카드', 'format': 'CSV', 'enabled': false},
-    {'id': 'hana', 'name': '하나카드', 'format': 'Excel(.xls)', 'enabled': false},
-    {'id': 'nh', 'name': 'NH농협카드', 'format': 'Excel(.xlsx)', 'enabled': false},
-    {'id': 'woori', 'name': '우리카드', 'format': 'Excel(.xls)', 'enabled': false},
-    {'id': 'bc', 'name': 'BC카드', 'format': 'CSV', 'enabled': false},
-  ];
-
   void _showImportSheet() {
     String? selectedCardId;
 
@@ -507,7 +423,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       child: StatefulBuilder(
         builder: (context, setSheetState) {
           final selectedCard = selectedCardId != null
-              ? _cardCompanies.firstWhere((c) => c['id'] == selectedCardId)
+              ? _cardCompanies.firstWhere((c) => c.id == selectedCardId)
               : null;
 
           return Column(
@@ -536,8 +452,8 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                 itemCount: _cardCompanies.length,
                 itemBuilder: (context, index) {
                   final card = _cardCompanies[index];
-                  final isEnabled = card['enabled'] == true;
-                  final isSelected = selectedCardId == card['id'];
+                  final isEnabled = card.enabled;
+                  final isSelected = selectedCardId == card.id;
 
                   return Material(
                     color: isSelected
@@ -549,7 +465,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                     child: InkWell(
                       onTap: isEnabled
                           ? () {
-                              setSheetState(() => selectedCardId = card['id'] as String);
+                              setSheetState(() => selectedCardId = card.id);
                             }
                           : null,
                       borderRadius: AppRadius.smAll,
@@ -568,7 +484,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              card['name'] as String,
+                              card.name,
                               style: AppTypography.bodySmall.copyWith(
                                 fontWeight:
                                     isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -612,7 +528,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                       Icon(LucideIcons.info, size: 16, color: AppColors.emerald600),
                       SizedBox(width: AppSpacing.sm),
                       Text(
-                        '${selectedCard['name']}: ${selectedCard['format']} 지원',
+                        '${selectedCard.name}: ${selectedCard.format} 지원',
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.emerald700,
                         ),
@@ -644,7 +560,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                       ),
                       SizedBox(height: AppSpacing.sm),
                       Text(
-                        '${selectedCard['format']} 파일을 선택하세요',
+                        '${selectedCard.format} 파일을 선택하세요',
                         style: AppTypography.bodySmall,
                       ),
                       SizedBox(height: AppSpacing.md),
@@ -812,21 +728,21 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  Widget _buildTransactionItem(Map<String, dynamic> tx) {
-    final isIncome = tx['type'] == 'income';
-    final amount = tx['amount'] as int;
+  Widget _buildTransactionItem(Transaction tx) {
+    final isIncome = tx.type == TransactionType.income;
+    final amount = tx.amount;
 
     // 전월 매칭
     final lastMonth = _findLastMonthMatch(tx);
     final int? changeAmount = lastMonth != null
-        ? amount - (lastMonth['amount'] as int)
+        ? amount - lastMonth.amount
         : null;
-    final double? changeRate = lastMonth != null && (lastMonth['amount'] as int) > 0
-        ? changeAmount! / (lastMonth['amount'] as int) * 100
+    final double? changeRate = lastMonth != null && lastMonth.amount > 0
+        ? changeAmount! / lastMonth.amount * 100
         : null;
 
     return GestureDetector(
-      key: ValueKey(tx['id']),
+      key: ValueKey(tx.id),
       onTap: () => _showEditEntrySheet(tx),
       onLongPress: () => _showDeleteConfirmDialog(tx),
       child: Container(
@@ -843,14 +759,14 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tx['name'] as String, style: AppTypography.bodyLarge),
+                  Text(tx.name, style: AppTypography.bodyLarge),
                   SizedBox(height: AppSpacing.xs),
                   Row(
                     children: [
-                      AlBadge.category(tx['category'] as String),
+                      AlBadge.category(tx.category),
                       SizedBox(width: AppSpacing.sm),
                       Text(
-                        tx['subCategory'] as String,
+                        tx.subCategory,
                         style: AppTypography.bodySmall,
                       ),
                     ],
@@ -858,10 +774,10 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                   SizedBox(height: AppSpacing.xs),
                   Row(
                     children: [
-                      Text(tx['date'] as String, style: AppTypography.caption),
-                      if (tx['editedBy'] != null) ...[
+                      Text(tx.date, style: AppTypography.caption),
+                      if (tx.editedBy != null) ...[
                         SizedBox(width: AppSpacing.sm),
-                        _buildEditorBadge(tx['editedBy'] as String),
+                        _buildEditorBadge(tx.editedBy!),
                       ],
                     ],
                   ),

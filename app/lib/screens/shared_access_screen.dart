@@ -11,80 +11,9 @@ import '../design_system/components/al_bottom_sheet.dart';
 import '../design_system/components/al_input.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
 import '../utils/snackbar_helper.dart';
-
-// ─── Data Models ─────────────────────────────────────────────────────────
-
-class _SharedUser {
-  final String id;
-  final String name;
-  final String email;
-  final String avatar;
-  String cashflowPermission;
-  Map<String, String> assetPermissions;
-
-  _SharedUser({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.avatar,
-    required this.cashflowPermission,
-    required this.assetPermissions,
-  });
-}
-
-class _Invitation {
-  final String id;
-  final String email;
-  final String? name;
-  final String? avatar;
-  String status; // 'pending' | 'accepted' | 'declined' | 'expired'
-  final String cashflowPermission;
-  final Map<String, String> assetPermissions;
-  final String? message;
-  final String sentDate;
-  final String? expiryDate;
-  final bool isIncoming;
-  final String? inviterName;
-
-  _Invitation({
-    required this.id,
-    required this.email,
-    this.name,
-    this.avatar,
-    required this.status,
-    required this.cashflowPermission,
-    required this.assetPermissions,
-    this.message,
-    required this.sentDate,
-    this.expiryDate,
-    required this.isIncoming,
-    this.inviterName,
-  });
-}
-
-class _AssetSubCategory {
-  final String id;
-  final String name;
-  final IconData icon;
-  final String color;
-
-  const _AssetSubCategory({
-    required this.id,
-    required this.name,
-    required this.icon,
-    required this.color,
-  });
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────
-
-const List<_AssetSubCategory> _assetSubCategories = [
-  _AssetSubCategory(id: 'real-estate', name: '부동산', icon: LucideIcons.home, color: 'blue'),
-  _AssetSubCategory(id: 'stocks', name: '주식/투자', icon: LucideIcons.trendingUp, color: 'green'),
-  _AssetSubCategory(id: 'cash', name: '현금/예금', icon: LucideIcons.wallet, color: 'purple'),
-  _AssetSubCategory(id: 'loans', name: '대출/부채', icon: LucideIcons.creditCard, color: 'red'),
-];
 
 // ─── Screen ──────────────────────────────────────────────────────────────
 
@@ -98,101 +27,21 @@ class SharedAccessScreen extends StatefulWidget {
 class _SharedAccessScreenState extends State<SharedAccessScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late List<_SharedUser> _users;
-  late List<_Invitation> _sentInvitations;
-  late List<_Invitation> _receivedInvitations;
+  final _repo = SharedAccessRepository();
+  late List<AssetSubCategory> _assetSubCategories;
+  late List<SharedUser> _users;
+  late List<Invitation> _sentInvitations;
+  late List<Invitation> _receivedInvitations;
   bool _defaultPublic = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-
-    _users = [
-      _SharedUser(
-        id: '1',
-        name: '김지은',
-        email: 'jieun@example.com',
-        avatar: '👩',
-        cashflowPermission: 'edit',
-        assetPermissions: {
-          'real-estate': 'edit',
-          'stocks': 'edit',
-          'cash': 'edit',
-          'loans': 'view',
-        },
-      ),
-      _SharedUser(
-        id: '2',
-        name: '박민수',
-        email: 'minsu@example.com',
-        avatar: '👨',
-        cashflowPermission: 'view',
-        assetPermissions: {
-          'real-estate': 'none',
-          'stocks': 'view',
-          'cash': 'view',
-          'loans': 'none',
-        },
-      ),
-    ];
-
-    _sentInvitations = [
-      _Invitation(
-        id: 'sent-1',
-        email: 'sister@example.com',
-        name: '홍지수',
-        status: 'pending',
-        cashflowPermission: 'view',
-        assetPermissions: {
-          'real-estate': 'view',
-          'stocks': 'none',
-          'cash': 'view',
-          'loans': 'none',
-        },
-        message: '같이 자산 관리해요!',
-        sentDate: '2026-03-24',
-        expiryDate: '2026-03-31',
-        isIncoming: false,
-      ),
-      _Invitation(
-        id: 'sent-2',
-        email: 'friend@example.com',
-        status: 'expired',
-        cashflowPermission: 'view',
-        assetPermissions: {
-          'real-estate': 'none',
-          'stocks': 'view',
-          'cash': 'none',
-          'loans': 'none',
-        },
-        sentDate: '2026-03-10',
-        expiryDate: '2026-03-17',
-        isIncoming: false,
-      ),
-    ];
-
-    _receivedInvitations = [
-      _Invitation(
-        id: 'recv-1',
-        email: 'dad@example.com',
-        name: '홍아버지',
-        avatar: '👨‍🦳',
-        status: 'pending',
-        cashflowPermission: 'edit',
-        assetPermissions: {
-          'real-estate': 'edit',
-          'stocks': 'edit',
-          'cash': 'view',
-          'loans': 'none',
-        },
-        message: '가족 자산을 함께 관리합시다.',
-        sentDate: '2026-03-25',
-        expiryDate: '2026-04-01',
-        isIncoming: true,
-        inviterName: '홍아버지',
-      ),
-    ];
+    _assetSubCategories = _repo.getAssetSubCategories();
+    _users = _repo.getSharedUsers();
+    _sentInvitations = _repo.getSentInvitations();
+    _receivedInvitations = _repo.getReceivedInvitations();
   }
 
   @override
@@ -203,28 +52,15 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
 
   // ─── Permission helpers ────────────────────────────────────────────────
 
-  void _cyclePermission(_SharedUser user, String type, [String? subCategoryId]) {
+  void _cyclePermission(SharedUser user, String type, [String? subCategoryId]) {
     setState(() {
       if (type == 'cashflow') {
-        user.cashflowPermission = _nextPermission(user.cashflowPermission);
+        user.cashflowPermission = user.cashflowPermission.next();
       } else if (type == 'asset' && subCategoryId != null) {
-        final current = user.assetPermissions[subCategoryId] ?? 'none';
-        user.assetPermissions[subCategoryId] = _nextPermission(current);
+        final current = user.assetPermissions[subCategoryId] ?? PermissionLevel.none;
+        user.assetPermissions[subCategoryId] = current.next();
       }
     });
-  }
-
-  String _nextPermission(String current) {
-    switch (current) {
-      case 'none':
-        return 'view';
-      case 'view':
-        return 'edit';
-      case 'edit':
-        return 'none';
-      default:
-        return 'none';
-    }
   }
 
   void _removeUser(String userId) {
@@ -244,17 +80,17 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     showInfoSnackBar(context, '초대가 취소되었습니다');
   }
 
-  void _resendInvitation(_Invitation inv) {
+  void _resendInvitation(Invitation inv) {
     setState(() {
-      inv.status = 'pending';
+      inv.status = InvitationStatus.pending;
     });
     showSuccessSnackBar(context, '초대가 재발송되었습니다');
   }
 
-  void _acceptInvitation(_Invitation inv) {
+  void _acceptInvitation(Invitation inv) {
     setState(() {
-      inv.status = 'accepted';
-      _users.add(_SharedUser(
+      inv.status = InvitationStatus.accepted;
+      _users.add(SharedUser(
         id: 'accepted-${inv.id}',
         name: inv.inviterName ?? inv.email.split('@').first,
         email: inv.email,
@@ -266,9 +102,9 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     showSuccessSnackBar(context, '초대를 수락했습니다');
   }
 
-  void _declineInvitation(_Invitation inv) {
+  void _declineInvitation(Invitation inv) {
     setState(() {
-      inv.status = 'declined';
+      inv.status = InvitationStatus.declined;
     });
     showInfoSnackBar(context, '초대를 거절했습니다');
   }
@@ -278,9 +114,9 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
   void _showInviteSheet() {
     final emailController = TextEditingController();
     final messageController = TextEditingController();
-    String inviteCashflowPerm = 'view';
-    Map<String, String> inviteAssetPerms = {
-      for (final cat in _assetSubCategories) cat.id: 'none',
+    PermissionLevel inviteCashflowPerm = PermissionLevel.view;
+    Map<String, PermissionLevel> inviteAssetPerms = {
+      for (final cat in _assetSubCategories) cat.id: PermissionLevel.none,
     };
 
     AlBottomSheet.show(
@@ -306,7 +142,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
                 permission: inviteCashflowPerm,
                 onTap: () {
                   setSheetState(() {
-                    inviteCashflowPerm = _nextPermission(inviteCashflowPerm);
+                    inviteCashflowPerm = inviteCashflowPerm.next();
                   });
                 },
               ),
@@ -321,13 +157,13 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
                   child: _buildPermissionSection(
                     icon: cat.icon,
                     title: cat.name,
-                    permission: inviteAssetPerms[cat.id] ?? 'none',
+                    permission: inviteAssetPerms[cat.id] ?? PermissionLevel.none,
                     compact: true,
                     colorKey: cat.color,
                     onTap: () {
                       setSheetState(() {
-                        final current = inviteAssetPerms[cat.id] ?? 'none';
-                        inviteAssetPerms[cat.id] = _nextPermission(current);
+                        final current = inviteAssetPerms[cat.id] ?? PermissionLevel.none;
+                        inviteAssetPerms[cat.id] = current.next();
                       });
                     },
                   ),
@@ -366,11 +202,11 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
                           setState(() {
                             _sentInvitations.insert(
                               0,
-                              _Invitation(
+                              Invitation(
                                 id: now.millisecondsSinceEpoch.toString(),
                                 email: emailController.text.trim(),
                                 name: null,
-                                status: 'pending',
+                                status: InvitationStatus.pending,
                                 cashflowPermission: inviteCashflowPerm,
                                 assetPermissions: Map.from(inviteAssetPerms),
                                 message: messageController.text.trim().isEmpty
@@ -405,10 +241,10 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
   // ─── Tab counts ────────────────────────────────────────────────────────
 
   int get _pendingSentCount =>
-      _sentInvitations.where((i) => i.status == 'pending').length;
+      _sentInvitations.where((i) => i.status == InvitationStatus.pending).length;
 
   int get _pendingReceivedCount =>
-      _receivedInvitations.where((i) => i.status == 'pending').length;
+      _receivedInvitations.where((i) => i.status == InvitationStatus.pending).length;
 
   // ─── Build ─────────────────────────────────────────────────────────────
 
@@ -626,7 +462,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildSentInvitationCard(_Invitation inv) {
+  Widget _buildSentInvitationCard(Invitation inv) {
     final statusConfig = _invitationStatusConfig(inv.status);
 
     return AlCard(
@@ -692,7 +528,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           ),
 
           // 액션 버튼
-          if (inv.status == 'pending') ...[
+          if (inv.status == InvitationStatus.pending) ...[
             SizedBox(height: AppSpacing.lg),
             Row(
               children: [
@@ -715,7 +551,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
               ],
             ),
           ],
-          if (inv.status == 'expired' || inv.status == 'declined') ...[
+          if (inv.status == InvitationStatus.expired || inv.status == InvitationStatus.declined) ...[
             SizedBox(height: AppSpacing.lg),
             AlButton(
               label: '다시 초대',
@@ -764,7 +600,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildReceivedInvitationCard(_Invitation inv) {
+  Widget _buildReceivedInvitationCard(Invitation inv) {
     final statusConfig = _invitationStatusConfig(inv.status);
 
     return AlCard(
@@ -849,7 +685,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
                 SizedBox(height: AppSpacing.sm),
                 // 자산 카테고리별
                 ..._assetSubCategories.map((cat) {
-                  final perm = inv.assetPermissions[cat.id] ?? 'none';
+                  final perm = inv.assetPermissions[cat.id] ?? PermissionLevel.none;
                   final isLast = cat.id == _assetSubCategories.last.id;
                   return Column(
                     children: [
@@ -884,7 +720,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           ),
 
           // 액션 버튼 (대기중일 때만)
-          if (inv.status == 'pending') ...[
+          if (inv.status == InvitationStatus.pending) ...[
             SizedBox(height: AppSpacing.lg),
             Row(
               children: [
@@ -911,7 +747,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildInviterAvatar(_Invitation inv) {
+  Widget _buildInviterAvatar(Invitation inv) {
     return AlAvatar.medium(
       text: inv.avatar ?? '👤',
       gradientColors: [AppColors.emerald400, AppColors.teal500],
@@ -920,16 +756,16 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
 
   // ─── Permission summary (한 줄 요약) ───────────────────────────────────
 
-  Widget _buildPermissionSummary(_Invitation inv) {
+  Widget _buildPermissionSummary(Invitation inv) {
     final parts = <String>[];
-    if (inv.cashflowPermission != 'none') {
-      parts.add('수입/지출: ${_permLabel(inv.cashflowPermission)}');
+    if (inv.cashflowPermission != PermissionLevel.none) {
+      parts.add('수입/지출: ${inv.cashflowPermission.label}');
     }
     final assetPerms = inv.assetPermissions.entries
-        .where((e) => e.value != 'none')
+        .where((e) => e.value != PermissionLevel.none)
         .map((e) {
       final cat = _assetSubCategories.firstWhere((c) => c.id == e.key);
-      return '${cat.name}(${_permLabel(e.value)})';
+      return '${cat.name}(${e.value.label})';
     });
     if (assetPerms.isNotEmpty) {
       parts.add('자산: ${assetPerms.join(', ')}');
@@ -949,23 +785,12 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  String _permLabel(String perm) {
-    switch (perm) {
-      case 'edit':
-        return '편집';
-      case 'view':
-        return '보기';
-      default:
-        return '없음';
-    }
-  }
-
   // ─── Permission row (읽기 전용, 받은 초대용) ───────────────────────────
 
   Widget _buildPermissionRow({
     required IconData icon,
     required String title,
-    required String permission,
+    required PermissionLevel permission,
     String? colorKey,
   }) {
     return Row(
@@ -1014,9 +839,9 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  _InvitationStatusConfig _invitationStatusConfig(String status) {
+  _InvitationStatusConfig _invitationStatusConfig(InvitationStatus status) {
     switch (status) {
-      case 'pending':
+      case InvitationStatus.pending:
         return _InvitationStatusConfig(
           label: '대기중',
           icon: LucideIcons.clock,
@@ -1024,7 +849,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           borderColor: AppColors.orange200,
           textColor: AppColors.orange600,
         );
-      case 'accepted':
+      case InvitationStatus.accepted:
         return _InvitationStatusConfig(
           label: '수락됨',
           icon: LucideIcons.checkCircle,
@@ -1032,7 +857,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           borderColor: AppColors.emerald200,
           textColor: AppColors.emerald700,
         );
-      case 'declined':
+      case InvitationStatus.declined:
         return _InvitationStatusConfig(
           label: '거절됨',
           icon: LucideIcons.xCircle,
@@ -1040,18 +865,10 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           borderColor: AppColors.red100,
           textColor: AppColors.red600,
         );
-      case 'expired':
+      case InvitationStatus.expired:
         return _InvitationStatusConfig(
           label: '만료됨',
           icon: LucideIcons.alertCircle,
-          bgColor: AppColors.gray50,
-          borderColor: AppColors.gray200,
-          textColor: AppColors.gray500,
-        );
-      default:
-        return _InvitationStatusConfig(
-          label: '알 수 없음',
-          icon: LucideIcons.helpCircle,
           bgColor: AppColors.gray50,
           borderColor: AppColors.gray200,
           textColor: AppColors.gray500,
@@ -1115,7 +932,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildUserCard(_SharedUser user) {
+  Widget _buildUserCard(SharedUser user) {
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1162,7 +979,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
             padding: EdgeInsets.all(AppSpacing.md),
             child: Column(
               children: _assetSubCategories.map((cat) {
-                final perm = user.assetPermissions[cat.id] ?? 'none';
+                final perm = user.assetPermissions[cat.id] ?? PermissionLevel.none;
                 final isLast = cat.id == _assetSubCategories.last.id;
                 return Column(
                   children: [
@@ -1197,7 +1014,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildAvatar(_SharedUser user) {
+  Widget _buildAvatar(SharedUser user) {
     return AlAvatar.medium(
       text: user.avatar,
       gradientColors: [AppColors.emerald400, AppColors.teal500],
@@ -1207,7 +1024,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
   Widget _buildPermissionSection({
     required IconData icon,
     required String title,
-    required String permission,
+    required PermissionLevel permission,
     required VoidCallback onTap,
     bool compact = false,
     String? colorKey,
@@ -1254,7 +1071,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  Widget _buildPermissionBadge(String permission) {
+  Widget _buildPermissionBadge(PermissionLevel permission) {
     final config = _permissionConfig(permission);
     return AnimatedContainer(
       duration: Duration(milliseconds: 200),
@@ -1282,9 +1099,9 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     );
   }
 
-  _PermissionBadgeConfig _permissionConfig(String permission) {
+  _PermissionBadgeConfig _permissionConfig(PermissionLevel permission) {
     switch (permission) {
-      case 'edit':
+      case PermissionLevel.edit:
         return _PermissionBadgeConfig(
           label: '편집',
           icon: LucideIcons.edit3,
@@ -1292,7 +1109,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           borderColor: AppColors.emerald200,
           textColor: AppColors.emerald700,
         );
-      case 'view':
+      case PermissionLevel.view:
         return _PermissionBadgeConfig(
           label: '보기',
           icon: LucideIcons.eye,
@@ -1300,7 +1117,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
           borderColor: AppColors.blue200,
           textColor: AppColors.blue700,
         );
-      default:
+      case PermissionLevel.none:
         return _PermissionBadgeConfig(
           label: '없음',
           icon: LucideIcons.eyeOff,

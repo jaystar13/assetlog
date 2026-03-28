@@ -13,167 +13,10 @@ import '../design_system/components/al_input.dart';
 import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
+import '../models/models.dart';
+import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
-
-// ─── Data Models ─────────────────────────────────────────────────────────────
-
-class AssetItem {
-  final String id;
-  final String name;
-  final num currentValue;
-  final num previousValue;
-  final String lastUpdated;
-  final String? editedBy;
-
-  const AssetItem({
-    required this.id,
-    required this.name,
-    required this.currentValue,
-    required this.previousValue,
-    required this.lastUpdated,
-    this.editedBy,
-  });
-
-  num get change => currentValue - previousValue;
-
-  double get changePercent {
-    if (previousValue == 0) return 0;
-    return ((currentValue - previousValue) / previousValue.abs()) * 100;
-  }
-}
-
-class AssetGroup {
-  final String id;
-  final String name;
-  final IconData icon;
-  final String colorKey;
-  final List<AssetItem> items;
-
-  const AssetGroup({
-    required this.id,
-    required this.name,
-    required this.icon,
-    required this.colorKey,
-    required this.items,
-  });
-
-  num get totalValue => items.fold<num>(0, (sum, item) => sum + item.currentValue);
-  num get totalPreviousValue =>
-      items.fold<num>(0, (sum, item) => sum + item.previousValue);
-
-  num get totalChange => totalValue - totalPreviousValue;
-
-  double get changePercent {
-    if (totalPreviousValue == 0) return 0;
-    return ((totalValue - totalPreviousValue) / totalPreviousValue.abs()) * 100;
-  }
-
-  CategoryColors get colors => AppColors.category[colorKey]!;
-}
-
-// ─── Dummy Data ──────────────────────────────────────────────────────────────
-
-final List<AssetGroup> _dummyGroups = [
-  AssetGroup(
-    id: 'real-estate',
-    name: '부동산',
-    icon: LucideIcons.building2,
-    colorKey: 'blue',
-    items: [
-      AssetItem(
-        id: 're-1',
-        name: '서울 아파트',
-        currentValue: 1020000000,
-        previousValue: 1000000000,
-        lastUpdated: '2026-03-15',
-        editedBy: '나',
-      ),
-      AssetItem(
-        id: 're-2',
-        name: '상가 건물',
-        currentValue: 540000000,
-        previousValue: 540000000,
-        lastUpdated: '2026-03-10',
-        editedBy: '김영수',
-      ),
-    ],
-  ),
-  AssetGroup(
-    id: 'stocks',
-    name: '주식/투자',
-    icon: LucideIcons.trendingUp,
-    colorKey: 'green',
-    items: [
-      AssetItem(
-        id: 'st-1',
-        name: 'S&P 500 ETF',
-        currentValue: 216000000,
-        previousValue: 210000000,
-        lastUpdated: '2026-03-20',
-        editedBy: '박지현',
-      ),
-      AssetItem(
-        id: 'st-2',
-        name: '테크 주식',
-        currentValue: 114000000,
-        previousValue: 118000000,
-        lastUpdated: '2026-03-18',
-        editedBy: '나',
-      ),
-    ],
-  ),
-  AssetGroup(
-    id: 'cash',
-    name: '현금/예금',
-    icon: LucideIcons.wallet,
-    colorKey: 'purple',
-    items: [
-      AssetItem(
-        id: 'ca-1',
-        name: '주거래 은행',
-        currentValue: 54000000,
-        previousValue: 50400000,
-        lastUpdated: '2026-03-22',
-        editedBy: '나',
-      ),
-      AssetItem(
-        id: 'ca-2',
-        name: '예금',
-        currentValue: 144000000,
-        previousValue: 143000000,
-        lastUpdated: '2026-03-01',
-        editedBy: '김영수',
-      ),
-    ],
-  ),
-  AssetGroup(
-    id: 'loans',
-    name: '대출/부채',
-    icon: LucideIcons.creditCard,
-    colorKey: 'red',
-    items: [
-      AssetItem(
-        id: 'lo-1',
-        name: '주택담보대출',
-        currentValue: -360000000,
-        previousValue: -366000000,
-        lastUpdated: '2026-03-05',
-        editedBy: '나',
-      ),
-      AssetItem(
-        id: 'lo-2',
-        name: '자동차 할부',
-        currentValue: -30000000,
-        previousValue: -32400000,
-        lastUpdated: '2026-03-05',
-        editedBy: '박지현',
-      ),
-    ],
-  ),
-];
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 class AssetTrackerScreen extends StatefulWidget {
   const AssetTrackerScreen({super.key});
@@ -190,7 +33,7 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    _groups = List.from(_dummyGroups);
+    _groups = List.from(AssetRepository().getAssetGroups());
   }
 
   num get _totalAssets {
