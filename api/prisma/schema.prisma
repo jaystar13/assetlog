@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String
+  avatar     String?
+  provider   String   // "google" | "kakao"
+  providerId String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  assets              Asset[]
+  transactions        Transaction[]
+  financialGoal       FinancialGoal?
+  refreshTokens       RefreshToken[]
+  sharedAccessOwned   SharedAccess[]  @relation("Owner")
+  sharedAccessGranted SharedAccess[]  @relation("SharedWith")
+  invitationsSent     Invitation[]    @relation("InvitationFrom")
+
+  @@unique([provider, providerId])
+  @@map("users")
+}
+
+// ─── RefreshToken ────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── FinancialGoal ───────────────────────────────────────────────────────────
+
+model FinancialGoal {
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startAmount  BigInt   @map("start_amount")
+  targetAmount BigInt   @map("target_amount")
+  deadline     DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("financial_goals")
+}
+
+// ─── Asset + ValueHistory ────────────────────────────────────────────────────
+
+model Asset {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId     String   @map("category_id") // "real-estate" | "stocks" | "cash" | "loans"
+  name           String
+  currentValue   BigInt   @map("current_value")
+  editedByUserId String?  @map("edited_by_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  valueHistory AssetValueHistory[]
+
+  @@index([userId, categoryId])
+  @@map("assets")
+}
+
+model AssetValueHistory {
+  id        String   @id @default(uuid())
+  assetId   String   @map("asset_id")
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  month     String   // "YYYY-MM"
+  value     BigInt
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@unique([assetId, month])
+  @@index([assetId])
+  @@map("asset_value_history")
+}
+
+// ─── Transaction ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // "income" | "expense"
+  name           String
+  amount         Int
+  date           DateTime
+  category       String
+  subCategory    String   @map("sub_category")
+  editedByUserId String?  @map("edited_by_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@map("transactions")
+}
+
+// ─── SharedAccess ────────────────────────────────────────────────────────────
+
+model SharedAccess {
+  id                 String   @id @default(uuid())
+  ownerUserId        String   @map("owner_user_id")
+  owner              User     @relation("Owner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sharedWithUserId   String   @map("shared_with_user_id")
+  sharedWith         User     @relation("SharedWith", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+  cashflowPermission String   @default("none") @map("cashflow_permission")
+  assetPermissions   Json     @default("{}") @map("asset_permissions")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerUserId, sharedWithUserId])
+  @@index([sharedWithUserId])
+  @@map("shared_access")
+}
+
+// ─── Invitation ──────────────────────────────────────────────────────────────
+
+model Invitation {
+  id                 String   @id @default(uuid())
+  fromUserId         String   @map("from_user_id")
+  fromUser           User     @relation("InvitationFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toEmail            String   @map("to_email")
+  status             String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
+  cashflowPermission String   @default("none") @map("cashflow_permission")
+  assetPermissions   Json     @default("{}") @map("asset_permissions")
+  message            String?
+  sentAt             DateTime @default(now()) @map("sent_at")
+  expiresAt          DateTime @map("expires_at")
+
+  @@index([toEmail])
+  @@index([fromUserId])
+  @@map("invitations")
+}
+
+// ─── Seed Tables ─────────────────────────────────────────────────────────────
+
+model CardCompany {
+  id      String  @id @default(uuid())
+  name    String
+  format  String
+  enabled Boolean @default(false)
+
+  @@map("card_companies")
+}
+
+model DailyQuote {
+  id     String @id @default(uuid())
+  text   String
+  author String
+
+  @@map("daily_quotes")
+}
