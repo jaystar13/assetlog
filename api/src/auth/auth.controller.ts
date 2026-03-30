@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Req,
+  Res,
   Body,
   UseGuards,
   HttpCode,
@@ -17,7 +18,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -46,8 +47,8 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Google OAuth 콜백 → 딥링크로 토큰 전달' })
-  async googleCallback(@Req() req: Request) {
-    return this.handleOAuthCallback(req);
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    return this.handleOAuthCallback(req, res);
   }
 
   // ─────────────────────── Kakao OAuth ───────────────────────
@@ -64,8 +65,8 @@ export class AuthController {
   @Get('kakao/callback')
   @UseGuards(AuthGuard('kakao'))
   @ApiOperation({ summary: 'Kakao OAuth 콜백 → 딥링크로 토큰 전달' })
-  async kakaoCallback(@Req() req: Request) {
-    return this.handleOAuthCallback(req);
+  async kakaoCallback(@Req() req: Request, @Res() res: Response) {
+    return this.handleOAuthCallback(req, res);
   }
 
   // ─────────────────────── Naver OAuth ───────────────────────
@@ -82,8 +83,8 @@ export class AuthController {
   @Get('naver/callback')
   @UseGuards(AuthGuard('naver'))
   @ApiOperation({ summary: 'Naver OAuth 콜백 → 딥링크로 토큰 전달' })
-  async naverCallback(@Req() req: Request) {
-    return this.handleOAuthCallback(req);
+  async naverCallback(@Req() req: Request, @Res() res: Response) {
+    return this.handleOAuthCallback(req, res);
   }
 
   // ─────────────────────── Token Refresh ───────────────────────
@@ -132,14 +133,11 @@ export class AuthController {
 
   // ─────────────────────── Private helper ───────────────────────
 
-  private async handleOAuthCallback(req: Request) {
+  private async handleOAuthCallback(req: Request, res: Response) {
     const user = req.user as { id: string; email: string };
     const tokens = await this.authService.issueTokens(user.id, user.email);
     const deepLink = this.configService.get<string>('APP_DEEP_LINK')!;
     const redirectUrl = `${deepLink}?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`;
-
-    // HTTP 응답 객체에 직접 리다이렉트
-    const res = (req as unknown as { res: { redirect: (url: string) => void } }).res;
     res.redirect(redirectUrl);
   }
 }
