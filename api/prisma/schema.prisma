@@ -103,6 +103,7 @@ model Transaction {
   date           DateTime
   category       String
   subCategory    String   @map("sub_category")
+  paymentMethod  String?  @map("payment_method") // 결제수단 (카드사명 또는 계좌이체/현금 등)
   editedByUserId String?  @map("edited_by_user_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")

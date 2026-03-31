@@ -25,12 +25,11 @@ class AlBadge extends StatelessWidget {
   }
 
   static final Map<String, ({Color bg, Color text})> _categoryColors = {
-    'Essential': (bg: AppColors.red100, text: AppColors.red700),
-    'Living': (bg: AppColors.orange100, text: AppColors.orange700),
-    'Optional': (bg: AppColors.purple100, text: AppColors.purple600),
-    'Salary': (bg: AppColors.green100, text: AppColors.green600),
-    'Financial': (bg: AppColors.green100, text: AppColors.green600),
-    'Business': (bg: AppColors.green100, text: AppColors.green600),
+    '급여': (bg: AppColors.green100, text: AppColors.green600),
+    '생활비': (bg: AppColors.orange100, text: AppColors.orange700),
+    '필수비': (bg: AppColors.red100, text: AppColors.red700),
+    '선택비': (bg: AppColors.purple100, text: AppColors.purple600),
+    '투자비': (bg: AppColors.blue100, text: AppColors.blue700),
   };
 
   @override

@@ -866,21 +866,18 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   String _type = 'income'; // income | expense
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
-  String _selectedCategory = 'Salary';
-  String _subCategory = '';
+  String _selectedCategory = '급여';
+  String _selectedSubCategory = '급여';
   DateTime _selectedDate = DateTime.now();
 
   // 수입: 입금 계좌
-  String _selectedIncomeAccount = '급여계좌';
-  static const _incomeAccounts = ['급여계좌', '퇴직연금계좌', '투자수익계좌', '부수입계좌'];
+  PaymentMethod _selectedIncomeAccount = PaymentMethod.salaryAccount;
 
-  // 지출: 결제 수단
-  String _selectedPaymentMethod = '신용카드';
-  static const _paymentMethods = ['신용카드', '계좌이체', '현금'];
+  // 지출: 결제 수단 (카드 외)
+  PaymentMethod _selectedPaymentMethod = PaymentMethod.bankTransfer;
 
   // 지출 > 신용카드: 카드 종류
-  String _selectedCreditCard = '신한카드';
-  static const _creditCards = ['신한카드', '현대카드', '삼성카드', 'KB국민카드', '롯데카드', '하나카드', 'NH농협카드'];
+  PaymentMethod _selectedCreditCard = PaymentMethod.shinhan;
 
   // 지출 > 계좌이체: 출금 계좌
   String _selectedTransferAccount = '주거래계좌';
@@ -891,13 +888,22 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   final _installmentMonthsController = TextEditingController();
   final _installmentRoundController = TextEditingController();
 
-  final _subCategoryController = TextEditingController();
+  static const _incomeCategories = ['급여'];
+  static const _expenseCategories = ['생활비', '필수비', '선택비', '투자비'];
 
-  static const _incomeCategories = ['Salary', 'Financial', 'Business'];
-  static const _expenseCategories = ['Essential', 'Optional', 'Living'];
+  static const _subCategoryMap = {
+    '급여': ['급여', '인센티브', 'PI', '정산환급', '연차보상'],
+    '생활비': ['생활', '주유'],
+    '필수비': ['교육', '교통', '의료', '통신', '주거(관리비)', '세금', '경조사', '명절'],
+    '선택비': ['여행', '문화'],
+    '투자비': ['구독(AI)', '구독(인프라)', '대출(원금)', '대출(이자)'],
+  };
 
   List<String> get _categories =>
       _type == 'income' ? _incomeCategories : _expenseCategories;
+
+  List<String> get _subCategories =>
+      _subCategoryMap[_selectedCategory] ?? [];
 
   @override
   void initState() {
@@ -907,9 +913,12 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       _type = data['type'] as String? ?? 'income';
       _nameController.text = data['name'] as String? ?? '';
       _amountController.text = (data['amount'] as int?)?.toString() ?? '';
-      _subCategory = data['subCategory'] as String? ?? '';
-      _subCategoryController.text = _subCategory;
       _selectedCategory = data['category'] as String? ?? _categories.first;
+      final savedSub = data['subCategory'] as String?;
+      final subOptions = _subCategoryMap[_selectedCategory] ?? [];
+      _selectedSubCategory = (savedSub != null && subOptions.contains(savedSub))
+          ? savedSub
+          : (subOptions.isNotEmpty ? subOptions.first : '');
 
       final dateStr = data['date'] as String?;
       if (dateStr != null) {
@@ -917,11 +926,11 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       }
 
       // 수입 관련
-      _selectedIncomeAccount = data['incomeAccount'] as String? ?? _incomeAccounts.first;
+      _selectedIncomeAccount = PaymentMethod.fromString(data['incomeAccount'] as String? ?? '') ?? PaymentMethod.salaryAccount;
 
       // 지출 관련
-      _selectedPaymentMethod = data['paymentMethod'] as String? ?? _paymentMethods.first;
-      _selectedCreditCard = data['creditCard'] as String? ?? _creditCards.first;
+      _selectedPaymentMethod = PaymentMethod.fromString(data['paymentMethod'] as String? ?? '') ?? PaymentMethod.bankTransfer;
+      _selectedCreditCard = PaymentMethod.fromString(data['creditCard'] as String? ?? '') ?? PaymentMethod.shinhan;
       _selectedTransferAccount = data['transferAccount'] as String? ?? _transferAccounts.first;
       _isInstallment = data['isInstallment'] == 'true';
       _installmentMonthsController.text = data['installmentMonths'] as String? ?? '';
@@ -933,7 +942,6 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   void dispose() {
     _nameController.dispose();
     _amountController.dispose();
-    _subCategoryController.dispose();
     _installmentMonthsController.dispose();
     _installmentRoundController.dispose();
     super.dispose();
@@ -966,23 +974,27 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       'date':
           '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
       'category': _selectedCategory,
-      'subCategory': _subCategory.isEmpty ? _selectedCategory : _subCategory,
+      'subCategory': _selectedSubCategory,
       'editedBy': '나',
     };
 
     if (_type == 'income') {
-      entry['incomeAccount'] = _selectedIncomeAccount;
+      entry['paymentMethod'] = _selectedIncomeAccount.value;
     } else {
-      entry['paymentMethod'] = _selectedPaymentMethod;
-      if (_selectedPaymentMethod == '신용카드') {
-        entry['creditCard'] = _selectedCreditCard;
+      final isCreditCard = cardCompanies.contains(_selectedCreditCard) &&
+          _selectedPaymentMethod == PaymentMethod.bankTransfer;
+      if (isCreditCard) {
+        entry['paymentMethod'] = _selectedCreditCard.value;
         entry['isInstallment'] = _isInstallment.toString();
         if (_isInstallment) {
           entry['installmentMonths'] = _installmentMonthsController.text.trim();
           entry['installmentRound'] = _installmentRoundController.text.trim();
         }
-      } else if (_selectedPaymentMethod == '계좌이체') {
-        entry['transferAccount'] = _selectedTransferAccount;
+      } else {
+        entry['paymentMethod'] = _selectedPaymentMethod.value;
+        if (_selectedPaymentMethod == PaymentMethod.bankTransfer) {
+          entry['transferAccount'] = _selectedTransferAccount;
+        }
       }
     }
 
@@ -1070,9 +1082,10 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
         if (_type == 'income') ...[
           Text('입금 계좌', style: AppTypography.label),
           SizedBox(height: AppSpacing.sm),
-          _buildDropdown(
+          _buildEnumDropdown<PaymentMethod>(
             value: _selectedIncomeAccount,
-            items: _incomeAccounts,
+            items: incomeAccounts,
+            labelOf: (e) => e.value,
             onChanged: (val) => setState(() => _selectedIncomeAccount = val!),
           ),
           SizedBox(height: AppSpacing.lg),
@@ -1082,27 +1095,35 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
         if (_type == 'expense') ...[
           Text('결제 수단', style: AppTypography.label),
           SizedBox(height: AppSpacing.sm),
-          _buildDropdown(
-            value: _selectedPaymentMethod,
-            items: _paymentMethods,
+          // 신용카드 vs 기타
+          _buildEnumDropdown<PaymentMethod>(
+            value: cardCompanies.contains(_selectedCreditCard)
+                ? PaymentMethod.shinhan // 카드 선택 중임을 표시하기 위한 sentinel
+                : _selectedPaymentMethod,
+            items: [PaymentMethod.shinhan, ...expensePaymentMethods],
+            labelOf: (e) => e == PaymentMethod.shinhan ? '신용카드' : e.value,
             onChanged: (val) {
               setState(() {
-                _selectedPaymentMethod = val!;
-                // 하위 선택값 초기화
-                _selectedCreditCard = _creditCards.first;
-                _selectedTransferAccount = _transferAccounts.first;
+                if (val == PaymentMethod.shinhan) {
+                  _selectedCreditCard = PaymentMethod.shinhan;
+                } else {
+                  _selectedPaymentMethod = val!;
+                  _selectedCreditCard = PaymentMethod.shinhan;
+                }
               });
             },
           ),
           SizedBox(height: AppSpacing.lg),
 
           // 지출 > 신용카드 선택 시: 카드 종류 + 할부
-          if (_selectedPaymentMethod == '신용카드') ...[
+          if (cardCompanies.contains(_selectedCreditCard) ||
+              _selectedPaymentMethod == PaymentMethod.shinhan) ...[
             Text('카드 종류', style: AppTypography.label),
             SizedBox(height: AppSpacing.sm),
-            _buildDropdown(
+            _buildEnumDropdown<PaymentMethod>(
               value: _selectedCreditCard,
-              items: _creditCards,
+              items: cardCompanies,
+              labelOf: (e) => e.value,
               onChanged: (val) => setState(() => _selectedCreditCard = val!),
             ),
             SizedBox(height: AppSpacing.lg),
@@ -1335,7 +1356,8 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           ],
 
           // 지출 > 계좌이체 선택 시: 출금 계좌
-          if (_selectedPaymentMethod == '계좌이체') ...[
+          if (_selectedPaymentMethod == PaymentMethod.bankTransfer &&
+              !cardCompanies.contains(_selectedCreditCard)) ...[
             Text('출금 계좌', style: AppTypography.label),
             SizedBox(height: AppSpacing.sm),
             _buildDropdown(
@@ -1356,17 +1378,28 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
               : _categories.first,
           items: _categories,
           onChanged: (val) {
-            if (val != null) setState(() => _selectedCategory = val);
+            if (val != null) {
+              setState(() {
+                _selectedCategory = val;
+                final subs = _subCategoryMap[val] ?? [];
+                _selectedSubCategory = subs.isNotEmpty ? subs.first : '';
+              });
+            }
           },
         ),
         SizedBox(height: AppSpacing.lg),
 
         // 세부 카테고리
-        AlInput(
-          label: '세부 카테고리',
-          placeholder: '예: 직장 급여, Groceries 등',
-          controller: _subCategoryController,
-          onChanged: (val) => _subCategory = val,
+        Text('세부 카테고리', style: AppTypography.label),
+        SizedBox(height: AppSpacing.sm),
+        _buildDropdown(
+          value: _subCategories.contains(_selectedSubCategory)
+              ? _selectedSubCategory
+              : (_subCategories.isNotEmpty ? _subCategories.first : ''),
+          items: _subCategories,
+          onChanged: (val) {
+            if (val != null) setState(() => _selectedSubCategory = val);
+          },
         ),
         SizedBox(height: AppSpacing.xl),
 
@@ -1404,6 +1437,34 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           style: AppTypography.bodyLarge,
           items: items
               .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnumDropdown<T>({
+    required T value,
+    required List<T> items,
+    required String Function(T) labelOf,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.gray300),
+        borderRadius: AppRadius.smAll,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: Icon(LucideIcons.chevronDown, size: 16, color: AppColors.gray500),
+          style: AppTypography.bodyLarge,
+          items: items
+              .map((item) => DropdownMenuItem(value: item, child: Text(labelOf(item))))
               .toList(),
           onChanged: onChanged,
         ),
