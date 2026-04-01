@@ -38,12 +38,17 @@ export class ImportController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['cardCompany', 'file'],
+      required: ['cardCompany', 'targetMonth', 'file'],
       properties: {
         cardCompany: {
           type: 'string',
           example: 'shinhan',
           description: '카드사 (shinhan)',
+        },
+        targetMonth: {
+          type: 'string',
+          example: '2026-03',
+          description: '귀속월 (YYYY-MM)',
         },
         file: {
           type: 'string',
@@ -57,10 +62,14 @@ export class ImportController {
     @CurrentUser('id') userId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('cardCompany') cardCompany: string,
+    @Body('targetMonth') targetMonth: string,
   ) {
     if (!file) throw new BadRequestException('파일을 업로드해주세요.');
     if (!cardCompany) throw new BadRequestException('카드사를 지정해주세요.');
+    if (!targetMonth || !/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) {
+      throw new BadRequestException('귀속월을 YYYY-MM 형식으로 입력해주세요.');
+    }
 
-    return this.importService.importTransactions(userId, cardCompany, file);
+    return this.importService.importTransactions(userId, cardCompany, targetMonth, file);
   }
 }

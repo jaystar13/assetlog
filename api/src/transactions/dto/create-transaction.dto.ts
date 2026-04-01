@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { ALL_PAYMENT_METHODS } from '../../common/constants/payment-method.constants';
 
 export const TRANSACTION_TYPES = ['income', 'expense'] as const;
@@ -53,4 +53,9 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsIn(ALL_PAYMENT_METHODS)
   paymentMethod?: string;
+
+  @ApiPropertyOptional({ example: '2026-03', description: '귀속월 (YYYY-MM) — 생략 시 date 기준으로 조회' })
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/, { message: 'targetMonth는 YYYY-MM 형식이어야 합니다.' })
+  targetMonth?: string;
 }

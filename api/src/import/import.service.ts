@@ -23,6 +23,7 @@ export class ImportService {
   async importTransactions(
     userId: string,
     cardCompany: string,
+    targetMonth: string,
     file: Express.Multer.File,
   ): Promise<ImportResult> {
     const entry = PARSERS[cardCompany.toLowerCase()];
@@ -50,7 +51,8 @@ export class ImportService {
         date: new Date(tx.date),
         category: DEFAULT_CATEGORY,
         subCategory: DEFAULT_SUBCATEGORY,
-        paymentMethod: entry.cardName, // 카드사명 자동 세팅
+        paymentMethod: entry.cardName,
+        targetMonth,
       })),
       skipDuplicates: false,
     });

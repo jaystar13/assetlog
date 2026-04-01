@@ -14,6 +14,7 @@ export class TransactionsService {
     const where: {
       userId: string;
       type?: string;
+      targetMonth?: string;
       date?: { gte: Date; lt: Date };
     } = { userId };
 
@@ -23,10 +24,26 @@ export class TransactionsService {
 
     if (query.month) {
       const [yyyy, mm] = query.month.split('-').map(Number);
-      where.date = {
-        gte: new Date(yyyy, mm - 1, 1),
-        lt: new Date(yyyy, mm, 1),
-      };
+      // targetMonth 있으면 귀속월 기준, 없으면 거래일자 기준으로 조회
+      where.targetMonth = query.month;
+      // targetMonth가 null인 수동 입력 거래도 함께 조회
+      return this.prisma.transaction.findMany({
+        where: {
+          userId,
+          ...(query.type ? { type: query.type } : {}),
+          OR: [
+            { targetMonth: query.month },
+            {
+              targetMonth: null,
+              date: {
+                gte: new Date(yyyy, mm - 1, 1),
+                lt: new Date(yyyy, mm, 1),
+              },
+            },
+          ],
+        },
+        orderBy: { date: 'desc' },
+      });
     }
 
     return this.prisma.transaction.findMany({
@@ -48,6 +65,7 @@ export class TransactionsService {
         category: dto.category,
         subCategory: dto.subCategory,
         paymentMethod: dto.paymentMethod ?? null,
+        targetMonth: dto.targetMonth ?? null,
       },
     });
   }
@@ -67,6 +85,7 @@ export class TransactionsService {
         ...(dto.category && { category: dto.category }),
         ...(dto.subCategory && { subCategory: dto.subCategory }),
         ...(dto.paymentMethod !== undefined && { paymentMethod: dto.paymentMethod }),
+        ...(dto.targetMonth !== undefined && { targetMonth: dto.targetMonth }),
         editedByUserId: userId,
       },
     });
