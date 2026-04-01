@@ -62,15 +62,15 @@ model FinancialGoal {
 // ─── Asset + ValueHistory ────────────────────────────────────────────────────
 
 model Asset {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  categoryId     String   @map("category_id") // "real-estate" | "stocks" | "cash" | "loans"
-  name           String
-  currentValue   BigInt   @map("current_value")
-  editedByUserId String?  @map("edited_by_user_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String    @map("category_id") // "real-estate" | "stocks" | "cash" | "loans"
+  name       String
+  status     String    @default("active") // "active" | "closed"
+  closedAt   DateTime? @map("closed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   valueHistory AssetValueHistory[]
 

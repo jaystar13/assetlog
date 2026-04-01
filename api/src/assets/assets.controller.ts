@@ -7,10 +7,11 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
@@ -24,13 +25,14 @@ export class AssetsController {
   constructor(private assetsService: AssetsService) {}
 
   @Get()
-  @ApiOperation({ summary: '내 자산 목록 조회' })
-  findAll(@CurrentUser('id') userId: string) {
-    return this.assetsService.findAll(userId);
+  @ApiOperation({ summary: '내 자산 목록 조회 (기본: active만)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'closed', 'all'], example: 'active' })
+  findAll(@CurrentUser('id') userId: string, @Query('status') status?: string) {
+    return this.assetsService.findAll(userId, status === 'all' ? undefined : status);
   }
 
   @Post()
-  @ApiOperation({ summary: '자산 추가 (당월 히스토리 자동 기록)' })
+  @ApiOperation({ summary: '자산 추가' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateAssetDto) {
     return this.assetsService.create(userId, dto);
   }
@@ -46,9 +48,16 @@ export class AssetsController {
     return this.assetsService.update(userId, id, dto);
   }
 
+  @Patch(':id/close')
+  @ApiOperation({ summary: '자산 종료 (soft close — 히스토리 보존)' })
+  @ApiParam({ name: 'id', description: '자산 ID' })
+  close(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.assetsService.close(userId, id);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: '자산 삭제' })
+  @ApiOperation({ summary: '자산 완전 삭제 (히스토리 포함)' })
   @ApiParam({ name: 'id', description: '자산 ID' })
   remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.assetsService.remove(userId, id);
@@ -62,7 +71,7 @@ export class AssetsController {
   }
 
   @Put(':id/history/:month')
-  @ApiOperation({ summary: '특정 월 자산 가치 기록 (B방식 upsert, month: YYYY-MM)' })
+  @ApiOperation({ summary: '월별 자산 가치 기록/수정 (month: YYYY-MM)' })
   @ApiParam({ name: 'id', description: '자산 ID' })
   @ApiParam({ name: 'month', description: '월 (YYYY-MM)', example: '2025-01' })
   upsertHistory(
