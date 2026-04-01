@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseShinhanXls } from './parsers/shinhan.parser';
+import { parseShinhanXls, type ParsedTransaction } from './parsers/shinhan.parser';
+import { parseKbXlsx } from './parsers/kb.parser';
 import { CARD_COMPANIES } from '../common/constants/payment-method.constants';
 
 export interface ImportResult {
@@ -9,11 +10,12 @@ export interface ImportResult {
   skipped: number;
 }
 
-type ParserFn = (content: string) => ReturnType<typeof parseShinhanXls>;
+type ParserFn = (buffer: Buffer) => ParsedTransaction[];
 
 // 파서 키 → 카드사명 (payment-method.constants.ts와 일치)
 const PARSERS: Record<string, { parse: ParserFn; cardName: (typeof CARD_COMPANIES)[number] }> = {
   shinhan: { parse: parseShinhanXls, cardName: '신한카드' },
+  kb: { parse: parseKbXlsx, cardName: 'KB국민카드' },
 };
 
 @Injectable()
@@ -31,8 +33,7 @@ export class ImportService {
       throw new BadRequestException(`지원하지 않는 카드사입니다: ${cardCompany}`);
     }
 
-    const fileContent = file.buffer.toString('utf-8');
-    const parsed = entry.parse(fileContent);
+    const parsed = entry.parse(file.buffer);
 
     if (parsed.length === 0) {
       return { total: 0, imported: 0, skipped: 0 };

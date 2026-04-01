@@ -60,8 +60,8 @@ function isOverseas(amountStr: string): boolean {
   return amountStr.includes('.');
 }
 
-export function parseShinhanXls(fileContent: string): ParsedTransaction[] {
-  const rows = extractTableRows(fileContent);
+export function parseShinhanXls(fileBuffer: Buffer): ParsedTransaction[] {
+  const rows = extractTableRows(fileBuffer.toString('utf-8'));
 
   // 헤더 행 탐색: '이용카드'와 '이용가맹점'이 독립 셀로 존재하는 행
   let headerIndex = -1;
