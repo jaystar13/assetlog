@@ -77,8 +77,12 @@ class AuthInterceptor extends Interceptor {
         }),
       );
 
-      final accessToken = response.data['accessToken'] as String;
-      final newRefreshToken = response.data['refreshToken'] as String;
+      final body = response.data;
+      final data = (body is Map<String, dynamic> && body.containsKey('data'))
+          ? body['data'] as Map<String, dynamic>
+          : body as Map<String, dynamic>;
+      final accessToken = data['accessToken'] as String;
+      final newRefreshToken = data['refreshToken'] as String;
 
       await _tokenStorage.saveTokens(
         accessToken: accessToken,

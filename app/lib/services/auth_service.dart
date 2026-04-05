@@ -19,9 +19,10 @@ class AuthService {
           'Authorization': 'Bearer $refreshToken',
         }),
       );
+      final data = _unwrap(response);
       return (
-        accessToken: response.data['accessToken'] as String,
-        refreshToken: response.data['refreshToken'] as String,
+        accessToken: data['accessToken'] as String,
+        refreshToken: data['refreshToken'] as String,
       );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -44,9 +45,37 @@ class AuthService {
   Future<Map<String, dynamic>> getMe() async {
     try {
       final response = await _dio.get('/auth/me');
-      return response.data as Map<String, dynamic>;
+      return _unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
+  }
+
+  /// PATCH /users/me — 프로필 수정
+  Future<Map<String, dynamic>> updateProfile({
+    String? name,
+    String? avatar,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '/users/me',
+        data: {
+          if (name != null) 'name': name,
+          if (avatar != null) 'avatar': avatar,
+        },
+      );
+      return _unwrap(response);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 백엔드 응답 래퍼 {data, meta}에서 data 추출
+  Map<String, dynamic> _unwrap(Response response) {
+    final body = response.data;
+    if (body is Map<String, dynamic> && body.containsKey('data')) {
+      return body['data'] as Map<String, dynamic>;
+    }
+    return body as Map<String, dynamic>;
   }
 }

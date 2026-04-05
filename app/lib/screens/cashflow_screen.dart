@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
@@ -13,78 +14,40 @@ import '../design_system/components/al_badge.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
+import '../core/notifiers/transaction_notifier.dart';
 import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 
-class CashFlowScreen extends StatefulWidget {
+class CashFlowScreen extends ConsumerStatefulWidget {
   const CashFlowScreen({super.key});
 
   @override
-  State<CashFlowScreen> createState() => _CashFlowScreenState();
+  ConsumerState<CashFlowScreen> createState() => _CashFlowScreenState();
 }
 
-class _CashFlowScreenState extends State<CashFlowScreen> {
-  final _repo = CashflowRepository();
-  DateTime _selectedMonth = DateTime(2026, 3);
+class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
+  DateTime _selectedMonth = DateTime.now();
+  final _cardCompanies = CashflowRepository().getCardCompanies();
 
   // 거래 내역 필터
   TransactionType? _txFilter;
 
-  late final List<Transaction> _transactions;
-  late final List<Transaction> _lastMonthTransactions;
-  late final int _lastMonthIncome;
-  late final int _lastMonthExpense;
-  late final List<CardCompany> _cardCompanies;
+  String get _monthKey =>
+      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
-  @override
-  void initState() {
-    super.initState();
-    _transactions = _repo.getTransactions();
-    _lastMonthTransactions = _repo.getLastMonthTransactions();
-    _lastMonthIncome = _repo.getLastMonthIncome();
-    _lastMonthExpense = _repo.getLastMonthExpense();
-    _cardCompanies = _repo.getCardCompanies();
-  }
-
-  List<Transaction> get _filteredTransactions =>
+  List<Transaction> _filterTransactions(List<Transaction> transactions) =>
       _txFilter == null
-          ? _transactions
-          : _transactions.where((t) => t.type == _txFilter).toList();
+          ? transactions
+          : transactions.where((t) => t.type == _txFilter).toList();
 
-  /// 항목명+카테고리+세부카테고리로 전월 매칭 거래를 찾는다.
-  Transaction? _findLastMonthMatch(Transaction tx) {
-    for (final prev in _lastMonthTransactions) {
-      if (prev.name == tx.name &&
-          prev.category == tx.category &&
-          prev.subCategory == tx.subCategory) {
-        return prev;
-      }
-    }
-    return null;
-  }
-
-  int get _totalIncome => _transactions
+  int _totalIncome(List<Transaction> txs) => txs
       .where((t) => t.type == TransactionType.income)
       .fold(0, (sum, t) => sum + t.amount);
 
-  int get _totalExpense => _transactions
+  int _totalExpense(List<Transaction> txs) => txs
       .where((t) => t.type == TransactionType.expense)
       .fold(0, (sum, t) => sum + t.amount);
-
-  int get _balance => _totalIncome - _totalExpense;
-
-  double get _expenseRatio =>
-      _totalIncome > 0 ? _totalExpense / _totalIncome : 0;
-
-  // 전월 대비 증감
-  int get _incomeChange => _totalIncome - _lastMonthIncome;
-  double get _incomeChangeRate =>
-      _lastMonthIncome > 0 ? _incomeChange / _lastMonthIncome * 100 : 0;
-
-  int get _expenseChange => _totalExpense - _lastMonthExpense;
-  double get _expenseChangeRate =>
-      _lastMonthExpense > 0 ? _expenseChange / _lastMonthExpense * 100 : 0;
 
   void _goToPreviousMonth() {
     setState(() {
@@ -109,12 +72,17 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       context: context,
       title: '수기 입력',
       child: _ManualEntryForm(
-        onSubmit: (entry) {
-          setState(() {
-            _transactions.add(Transaction.fromMap(entry));
-          });
+        onSubmit: (entry) async {
           Navigator.of(context).pop();
-          showSuccessSnackBar(context, '거래가 추가되었습니다');
+          await ref.read(transactionNotifierProvider(_monthKey).notifier).addTransaction(
+            type: entry['type'] as String,
+            name: entry['name'] as String,
+            amount: entry['amount'] as int,
+            date: entry['date'] as String,
+            category: entry['category'] as String,
+            subCategory: entry['subCategory'] as String,
+          );
+          if (mounted) showSuccessSnackBar(context, '거래가 추가되었습니다');
         },
       ),
     );
@@ -126,15 +94,13 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       title: '거래 수정',
       child: _ManualEntryForm(
         initialData: tx.toMap(),
-        onSubmit: (updated) {
-          setState(() {
-            final index = _transactions.indexWhere((t) => t.id == updated['id']);
-            if (index != -1) {
-              _transactions[index] = Transaction.fromMap(updated);
-            }
-          });
+        onSubmit: (updated) async {
           Navigator.of(context).pop();
-          showSuccessSnackBar(context, '거래가 수정되었습니다');
+          await ref.read(transactionNotifierProvider(_monthKey).notifier).updateTransaction(
+            tx.id,
+            updated,
+          );
+          if (mounted) showSuccessSnackBar(context, '거래가 수정되었습니다');
         },
       ),
     );
@@ -145,11 +111,9 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       context: context,
       title: '거래 삭제',
       message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-      onConfirm: () {
-        setState(() {
-          _transactions.removeWhere((t) => t.id == tx.id);
-        });
-        showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+      onConfirm: () async {
+        await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
+        if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
       },
     );
   }
@@ -174,49 +138,52 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
 
           // Scrollable content
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: AppSpacing.screenPadding,
-                right: AppSpacing.screenPadding,
-                bottom: AppSpacing.bottomNavSafeArea,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: AppSpacing.lg),
+            child: ref.watch(transactionNotifierProvider(_monthKey)).when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
+              data: (transactions) {
+                final filtered = _filterTransactions(transactions);
+                final income = _totalIncome(transactions);
+                final expense = _totalExpense(transactions);
+                final balance = income - expense;
+                final expenseRatio = income > 0 ? expense / income : 0.0;
 
-                    // Monthly Summary card
-                    _buildMonthlySummaryCard(),
-                    SizedBox(height: AppSpacing.sectionGap),
-
-                    // Smart Import area
-                    _buildSmartImportCard(),
-                    SizedBox(height: AppSpacing.lg),
-
-                    // Manual entry button
-                    AlButton(
-                      label: '수기 입력',
-                      onPressed: _showManualEntrySheet,
-                      icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
-                    ),
-                    SizedBox(height: AppSpacing.sectionGap),
-
-                    // Transaction list header + filter dropdown
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('거래 내역', style: AppTypography.heading3),
-                        _buildTxFilterSegment(),
-                      ],
-                    ),
-                    SizedBox(height: AppSpacing.md),
-
-                    ..._filteredTransactions.map(_buildTransactionItem),
-                  ],
-                ),
-              ),
+                return SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.screenPadding,
+                    right: AppSpacing.screenPadding,
+                    bottom: AppSpacing.bottomNavSafeArea,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: AppSpacing.lg),
+                      _buildMonthlySummaryCard(income: income, expense: expense, balance: balance, expenseRatio: expenseRatio),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildSmartImportCard(),
+                      SizedBox(height: AppSpacing.lg),
+                      AlButton(
+                        label: '수기 입력',
+                        onPressed: _showManualEntrySheet,
+                        icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
+                      ),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('거래 내역', style: AppTypography.heading3),
+                          _buildTxFilterSegment(),
+                        ],
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      ...filtered.map(_buildTransactionItem),
+                    ],
+                  ),
+                );
+              },
             ),
-          ],
+          ),
+        ],
         ),
     );
   }
@@ -262,7 +229,12 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  Widget _buildMonthlySummaryCard() {
+  Widget _buildMonthlySummaryCard({
+    required int income,
+    required int expense,
+    required int balance,
+    required double expenseRatio,
+  }) {
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,13 +252,11 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                     Text('수입', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_totalIncome),
+                      formatKoreanWon(income),
                       style: AppTypography.amountMedium.copyWith(
                         color: AppColors.green600,
                       ),
                     ),
-                    SizedBox(height: AppSpacing.xs),
-                    _buildChangeIndicator(_incomeChange, _incomeChangeRate, isIncome: true),
                   ],
                 ),
               ),
@@ -297,13 +267,11 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                     Text('지출', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_totalExpense),
+                      formatKoreanWon(expense),
                       style: AppTypography.amountMedium.copyWith(
                         color: AppColors.red600,
                       ),
                     ),
-                    SizedBox(height: AppSpacing.xs),
-                    _buildChangeIndicator(_expenseChange, _expenseChangeRate, isIncome: false),
                   ],
                 ),
               ),
@@ -315,7 +283,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
           ClipRRect(
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
-              value: _expenseRatio.clamp(0.0, 1.0),
+              value: expenseRatio.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.green100,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.red600),
@@ -329,9 +297,9 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
             children: [
               Text('잔액', style: AppTypography.bodyMedium),
               Text(
-                formatKoreanWon(_balance),
+                formatKoreanWon(balance),
                 style: AppTypography.amountSmall.copyWith(
-                  color: _balance >= 0
+                  color: balance >= 0
                       ? AppColors.emerald600
                       : AppColors.red600,
                 ),
@@ -343,75 +311,6 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  /// 전월 대비 증감 표시 위젯
-  /// [isIncome] true면 증가=긍정(초록), false(지출)면 증가=부정(빨강)
-  /// [compact] true면 아이콘 없이 텍스트만 (거래 항목용), false면 아이콘+금액 포함 (요약 카드용)
-  Widget _buildChangeIndicator(int change, double rate, {required bool isIncome, bool compact = false}) {
-    if (change == 0) {
-      return Text('전월과 동일', style: AppTypography.caption);
-    }
-
-    final isPositive = change > 0;
-    // 수입 증가 → 긍정(초록), 지출 증가 → 부정(빨강)
-    final isGood = isIncome ? isPositive : !isPositive;
-    final color = isGood ? AppColors.green600 : AppColors.red600;
-    final bgColor = isGood ? AppColors.green100 : AppColors.red100;
-    final sign = isPositive ? '+' : '';
-
-    if (compact) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: AppRadius.smAll,
-        ),
-        child: Text(
-          '$sign${rate.toStringAsFixed(1)}% ($sign${formatKoreanWon(change)})',
-          style: AppTypography.caption.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-            fontSize: 10,
-          ),
-        ),
-      );
-    }
-
-    final icon = isPositive ? LucideIcons.trendingUp : LucideIcons.trendingDown;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: AppRadius.smAll,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          SizedBox(width: 4),
-          Text(
-            '$sign${rate.toStringAsFixed(1)}%',
-            style: AppTypography.caption.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-            ),
-          ),
-          SizedBox(width: 4),
-          Text(
-            '($sign${formatKoreanWon(change)})',
-            style: AppTypography.caption.copyWith(
-              color: color,
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showImportSheet() {
     String? selectedCardId;
@@ -732,15 +631,6 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     final isIncome = tx.type == TransactionType.income;
     final amount = tx.amount;
 
-    // 전월 매칭
-    final lastMonth = _findLastMonthMatch(tx);
-    final int? changeAmount = lastMonth != null
-        ? amount - lastMonth.amount
-        : null;
-    final double? changeRate = lastMonth != null && lastMonth.amount > 0
-        ? changeAmount! / lastMonth.amount * 100
-        : null;
-
     return GestureDetector(
       key: ValueKey(tx.id),
       onTap: () => _showEditEntrySheet(tx),
@@ -795,25 +685,6 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                     color: isIncome ? AppColors.green600 : AppColors.red600,
                   ),
                 ),
-                if (changeAmount != null) ...[
-                  SizedBox(height: AppSpacing.xs),
-                  changeAmount != 0
-                      ? _buildChangeIndicator(changeAmount, changeRate!, isIncome: isIncome, compact: true)
-                      : Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.gray100,
-                            borderRadius: AppRadius.smAll,
-                          ),
-                          child: Text(
-                            '전월 동일',
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.gray500,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                ],
               ],
             ),
           ],

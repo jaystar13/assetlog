@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../design_system/tokens/colors.dart';
@@ -14,40 +15,20 @@ import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
-import '../repositories/repositories.dart';
+import '../core/notifiers/asset_notifier.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 
-class AssetTrackerScreen extends StatefulWidget {
+class AssetTrackerScreen extends ConsumerStatefulWidget {
   const AssetTrackerScreen({super.key});
 
   @override
-  State<AssetTrackerScreen> createState() => _AssetTrackerScreenState();
+  ConsumerState<AssetTrackerScreen> createState() => _AssetTrackerScreenState();
 }
 
-class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
-  DateTime _selectedMonth = DateTime(2026, 3);
+class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
+  DateTime _selectedMonth = DateTime.now();
   final Set<String> _expandedGroups = {};
-  late List<AssetGroup> _groups;
-
-  @override
-  void initState() {
-    super.initState();
-    _groups = List.from(AssetRepository().getAssetGroups());
-  }
-
-  num get _totalAssets {
-    return _groups.fold<num>(0, (sum, g) => sum + g.totalValue);
-  }
-
-  num get _totalPrevious {
-    return _groups.fold<num>(0, (sum, g) => sum + g.totalPreviousValue);
-  }
-
-  double get _totalChangePercent {
-    if (_totalPrevious == 0) return 0;
-    return ((_totalAssets - _totalPrevious) / _totalPrevious.abs()) * 100;
-  }
 
   void _toggleGroup(String id) {
     setState(() {
@@ -85,7 +66,8 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
   void _showAddAssetSheet() {
     final nameController = TextEditingController();
     final valueController = TextEditingController();
-    String selectedGroup = _groups.first.id;
+    final groups = ref.read(assetNotifierProvider).valueOrNull ?? [];
+    String selectedGroup = groups.isNotEmpty ? groups.first.id : 'cash';
 
     AlBottomSheet.show(
       context: context,
@@ -111,7 +93,7 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
                     isExpanded: true,
                     icon: Icon(LucideIcons.chevronDown, size: 16, color: AppColors.gray500),
                     style: AppTypography.bodyLarge,
-                    items: _groups
+                    items: groups
                         .map((g) => DropdownMenuItem(
                               value: g.id,
                               child: Row(
@@ -153,7 +135,7 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
               AlButton(
                 label: '자산 추가',
                 icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
                   final name = nameController.text.trim();
                   final valueText = valueController.text.trim();
 
@@ -172,39 +154,20 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
                     return;
                   }
 
-                  // 부채 그룹이면 음수로 저장
-                  final isDebt = selectedGroup == 'loans';
-                  final actualValue = isDebt ? -value.abs() : value;
+                  Navigator.of(context).pop();
 
-                  final newItem = AssetItem(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  final notifier = ref.read(assetNotifierProvider.notifier);
+                  await notifier.addAsset(
+                    categoryId: selectedGroup,
                     name: name,
-                    currentValue: actualValue,
-                    previousValue: actualValue, // 신규이므로 이전값 = 현재값
-                    lastUpdated:
-                        '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}',
-                    editedBy: '나',
                   );
 
-                  setState(() {
-                    final groupIndex =
-                        _groups.indexWhere((g) => g.id == selectedGroup);
-                    if (groupIndex != -1) {
-                      final group = _groups[groupIndex];
-                      _groups[groupIndex] = AssetGroup(
-                        id: group.id,
-                        name: group.name,
-                        icon: group.icon,
-                        colorKey: group.colorKey,
-                        items: [...group.items, newItem],
-                      );
-                      // 해당 그룹을 자동으로 펼침
-                      _expandedGroups.add(group.id);
-                    }
-                  });
+                  // 값도 함께 기록
+                  // addAsset 후 새 자산 ID를 알 수 없으므로 리프레시 후 처리
+                  // TODO: 백엔드에서 create 응답으로 ID 반환 시 upsertHistory 호출
 
-                  Navigator.of(context).pop();
-                  showSuccessSnackBar(context, '자산이 추가되었습니다');
+                  _expandedGroups.add(selectedGroup);
+                  if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
                 },
               ),
             ],
@@ -277,7 +240,7 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
               AlButton(
                 label: '수정',
                 icon: Icon(LucideIcons.pencil, size: 18, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
                   final name = nameController.text.trim();
                   final valueText = valueController.text.trim();
 
@@ -297,38 +260,18 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
                   }
 
                   final isDebt = group.id == 'loans';
-                  final actualValue = isDebt ? -value.abs() : value;
-
-                  final updatedItem = AssetItem(
-                    id: item.id,
-                    name: name,
-                    currentValue: actualValue,
-                    previousValue: item.previousValue,
-                    lastUpdated:
-                        '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}',
-                    editedBy: '나',
-                  );
-
-                  setState(() {
-                    final groupIndex =
-                        _groups.indexWhere((g) => g.id == group.id);
-                    if (groupIndex != -1) {
-                      final g = _groups[groupIndex];
-                      final newItems = g.items.map((i) {
-                        return i.id == item.id ? updatedItem : i;
-                      }).toList();
-                      _groups[groupIndex] = AssetGroup(
-                        id: g.id,
-                        name: g.name,
-                        icon: g.icon,
-                        colorKey: g.colorKey,
-                        items: newItems,
-                      );
-                    }
-                  });
+                  final actualValue = isDebt ? -value.abs().toInt() : value.toInt();
 
                   Navigator.of(context).pop();
-                  showSuccessSnackBar(context, '자산이 수정되었습니다');
+
+                  final month = '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+                  await ref.read(assetNotifierProvider.notifier).updateAssetValue(
+                    assetId: item.id,
+                    month: month,
+                    value: actualValue,
+                  );
+
+                  if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
                 },
               ),
             ],
@@ -344,22 +287,9 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
       context: context,
       title: '자산 삭제',
       message: "'${item.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-      onConfirm: () {
-        setState(() {
-          final groupIndex = _groups.indexWhere((g) => g.id == group.id);
-          if (groupIndex != -1) {
-            final g = _groups[groupIndex];
-            final newItems = g.items.where((i) => i.id != item.id).toList();
-            _groups[groupIndex] = AssetGroup(
-              id: g.id,
-              name: g.name,
-              icon: g.icon,
-              colorKey: g.colorKey,
-              items: newItems,
-            );
-          }
-        });
-        showSuccessSnackBar(context, "'${item.name}' 항목이 삭제되었습니다");
+      onConfirm: () async {
+        await ref.read(assetNotifierProvider.notifier).deleteAsset(item.id);
+        if (mounted) showSuccessSnackBar(context, "'${item.name}' 항목이 삭제되었습니다");
       },
     );
   }
@@ -435,7 +365,10 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
 
           // Scrollable content
           Expanded(
-            child: SingleChildScrollView(
+            child: ref.watch(assetNotifierProvider).when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
+              data: (groups) => SingleChildScrollView(
                 padding: EdgeInsets.only(
                   left: AppSpacing.screenPadding,
                   right: AppSpacing.screenPadding,
@@ -445,9 +378,9 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: AppSpacing.lg),
-                    _buildPieChartCard(),
+                    _buildPieChartCard(groups),
                     SizedBox(height: AppSpacing.sectionGap),
-                    ..._groups.map((group) => Padding(
+                    ...groups.map((group) => Padding(
                           key: ValueKey(group.id),
                           padding: EdgeInsets.only(bottom: AppSpacing.lg),
                           child: _buildAssetGroupCard(group),
@@ -459,17 +392,18 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
                 ),
               ),
             ),
-          ],
+          ),
+        ],
         ),
     );
   }
 
   // ─── Pie Chart Card ──────────────────────────────────────────────────
 
-  Widget _buildPieChartCard() {
+  Widget _buildPieChartCard(List<AssetGroup> groups) {
     // Only include positive-value groups for the composition chart
     final positiveGroups =
-        _groups.where((g) => g.totalValue > 0).toList();
+        groups.where((g) => g.totalValue > 0).toList();
     final totalPositive =
         positiveGroups.fold<num>(0, (sum, g) => sum + g.totalValue);
 
@@ -484,17 +418,9 @@ class _AssetTrackerScreenState extends State<AssetTrackerScreen> {
               Row(
                 children: [
                   Text(
-                    '총 ${formatKoreanWon(_totalAssets)}',
+                    '총 ${formatKoreanWon(groups.fold<num>(0, (sum, g) => sum + g.totalValue))}',
                     style: AppTypography.label,
                   ),
-                  if (_totalChangePercent != 0) ...[
-                    SizedBox(width: AppSpacing.sm),
-                    AlChangeIndicator.percent(
-                      percent: _totalChangePercent,
-                      iconSize: 12,
-                      fontSize: 11,
-                    ),
-                  ],
                 ],
               ),
             ],

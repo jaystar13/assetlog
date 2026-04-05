@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../core/providers.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
@@ -10,14 +12,14 @@ import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../utils/user_preferences.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _prefs = UserPreferences();
 
   @override
@@ -74,6 +76,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.user;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -89,19 +94,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         child: Column(
           children: [
-            // 프로필 상단
-            _buildProfileHeader(),
+            _buildProfileHeader(user),
             SizedBox(height: AppSpacing.sectionGap),
-
-            // 프로필 정보
-            _buildInfoCard(),
+            _buildInfoCard(user),
             SizedBox(height: AppSpacing.lg),
-
-            // 활동 요약
             _buildActivityCard(),
             SizedBox(height: AppSpacing.sectionGap),
-
-            // 프로필 수정 버튼
             AlButton(
               label: '프로필 수정',
               variant: AlButtonVariant.secondary,
@@ -119,25 +117,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(Map<String, dynamic>? user) {
+    final name = user?['name'] as String? ?? '사용자';
+    final email = user?['email'] as String? ?? '';
+    final initial = name.isNotEmpty ? name.characters.first : '?';
+
     return Column(
       children: [
-        // 큰 아바타
-        const AlAvatar.large(text: '홍'),
+        AlAvatar.large(text: initial),
         SizedBox(height: AppSpacing.lg),
-
-        // 이름
-        Text('홍길동', style: AppTypography.heading2),
+        Text(name, style: AppTypography.heading2),
         SizedBox(height: AppSpacing.xs),
-
-        // 이메일
         Text(
-          'hong@assetlog.com',
+          email,
           style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500),
         ),
         SizedBox(height: AppSpacing.sm),
-
-        // 한 줄 소개 (탭하여 수정)
         GestureDetector(
           onTap: _showSubtitleEditDialog,
           child: Container(
@@ -165,24 +160,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(Map<String, dynamic>? user) {
+    final provider = user?['provider'] as String? ?? '-';
+    final createdAt = user?['createdAt'] as String? ?? '-';
+    final joinDate = createdAt != '-'
+        ? createdAt.substring(0, 10)
+        : '-';
+
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('기본 정보', style: AppTypography.heading3),
           SizedBox(height: AppSpacing.lg),
-          _buildInfoRow(LucideIcons.phone, '연락처', '010-1234-5678'),
+          _buildInfoRow(LucideIcons.logIn, '로그인 방식', _providerLabel(provider)),
           _buildDivider(),
-          _buildInfoRow(LucideIcons.calendarPlus, '가입일', '2026-01-15'),
-          _buildDivider(),
-          _buildInfoRow(LucideIcons.clock, '마지막 로그인', '2026-03-25 09:30'),
+          _buildInfoRow(LucideIcons.calendarPlus, '가입일', joinDate),
         ],
       ),
     );
   }
 
+  String _providerLabel(String provider) {
+    switch (provider) {
+      case 'google':
+        return 'Google';
+      case 'kakao':
+        return '카카오';
+      case 'naver':
+        return '네이버';
+      default:
+        return provider;
+    }
+  }
+
   Widget _buildActivityCard() {
+    // TODO: 실제 데이터로 교체 (Phase 3 후반)
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,9 +204,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              Expanded(child: _buildStatItem('등록 자산', '8', LucideIcons.wallet)),
-              Expanded(child: _buildStatItem('이번 달 거래', '5', LucideIcons.arrowLeftRight)),
-              Expanded(child: _buildStatItem('공유 멤버', '2', LucideIcons.users)),
+              Expanded(child: _buildStatItem('등록 자산', '-', LucideIcons.wallet)),
+              Expanded(child: _buildStatItem('이번 달 거래', '-', LucideIcons.arrowLeftRight)),
+              Expanded(child: _buildStatItem('공유 멤버', '-', LucideIcons.users)),
             ],
           ),
         ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../core/providers.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
@@ -8,13 +10,14 @@ import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
 import '../design_system/components/al_avatar.dart';
+import '../design_system/components/al_confirm_dialog.dart';
 import '../design_system/components/al_screen_header.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -32,7 +35,7 @@ class MoreScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 프로필 요약 카드
-              _buildProfileCard(context),
+              _buildProfileCard(context, ref),
               SizedBox(height: AppSpacing.sectionGap),
 
               // 서비스 섹션
@@ -110,7 +113,18 @@ class MoreScreen extends StatelessWidget {
                 label: '로그아웃',
                 variant: AlButtonVariant.danger,
                 icon: Icon(LucideIcons.logOut, size: 18, color: AppColors.red600),
-                onPressed: () {},
+                onPressed: () {
+                  AlConfirmDialog.show(
+                    context: context,
+                    title: '로그아웃',
+                    message: '정말 로그아웃하시겠습니까?',
+                    confirmLabel: '로그아웃',
+                    isDestructive: true,
+                    onConfirm: () {
+                      ref.read(authNotifierProvider.notifier).logout();
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -121,25 +135,28 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileCard(BuildContext context) {
+  Widget _buildProfileCard(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.user;
+    final name = user?['name'] as String? ?? '사용자';
+    final email = user?['email'] as String? ?? '';
+    final initial = name.isNotEmpty ? name.characters.first : '?';
+
     return GestureDetector(
       onTap: () => context.push('/more/profile'),
       child: AlCard(
         child: Row(
           children: [
-            // 아바타
-            const AlAvatar.medium(text: '홍'),
+            AlAvatar.medium(text: initial),
             SizedBox(width: AppSpacing.lg),
-
-            // 이름 + 이메일
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('홍길동', style: AppTypography.heading3),
+                  Text(name, style: AppTypography.heading3),
                   SizedBox(height: 2),
                   Text(
-                    'hong@assetlog.com',
+                    email,
                     style: AppTypography.bodySmall.copyWith(
                       color: AppColors.gray500,
                     ),
@@ -147,8 +164,6 @@ class MoreScreen extends StatelessWidget {
                 ],
               ),
             ),
-
-            // 화살표
             Icon(
               LucideIcons.chevronRight,
               size: 20,

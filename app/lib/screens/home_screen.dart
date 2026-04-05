@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import '../design_system/tokens/colors.dart';
@@ -14,19 +15,21 @@ import '../design_system/components/al_stat_row.dart';
 import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_section_header.dart';
 import '../models/models.dart';
+import '../core/notifiers/home_notifier.dart';
+import '../core/providers.dart';
 import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/user_preferences.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _goalAnimController;
   late final Animation<double> _goalAnim;
@@ -170,18 +173,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  double get goalPercent =>
-      _repo.goalAmount > 0 ? (_repo.currentNetWorth / _repo.goalAmount * 100).clamp(0, 100) : 0;
-
-  double get netWorthChangePercent {
-    if (_repo.lastMonthNetWorth == 0) return 0;
-    return (_repo.currentNetWorth - _repo.lastMonthNetWorth) / _repo.lastMonthNetWorth * 100;
-  }
-
-  int get netWorthGrowth => _repo.currentNetWorth - _repo.lastMonthNetWorth;
-
-  double get cashFlowRatio =>
-      _repo.monthlyIncome > 0 ? _repo.monthlyExpense / _repo.monthlyIncome : 0;
+  // dashboard 데이터 헬퍼 — build()에서 세팅
+  HomeDashboard? _dashboard;
 
   void _showGoalSettingSheet() {
     _goalStartController.text = _repo.goalStartAmount.toString();
@@ -248,34 +241,43 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final dashboardAsync = ref.watch(homeNotifierProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        padding: EdgeInsets.only(bottom: AppSpacing.bottomNavSafeArea),
-        child: Column(
-          children: [
-            _buildHeader(),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
-              child: Column(
-                children: [
-                  SizedBox(height: AppSpacing.lg),
-                  _buildDailyQuote(),
-                  SizedBox(height: AppSpacing.sectionGap),
-                  _buildGoalVisualizerCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
-                  _buildNetWorthCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
-                  _buildGrowthInsightCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
-                  _buildMonthlyCashFlowCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
-                  _buildSharedAssetsSection(),
-                ],
-              ),
+      body: dashboardAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다')),
+        data: (dashboard) {
+          _dashboard = dashboard;
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: AppSpacing.bottomNavSafeArea),
+            child: Column(
+              children: [
+                _buildHeader(),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                  child: Column(
+                    children: [
+                      SizedBox(height: AppSpacing.lg),
+                      _buildDailyQuote(),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildGoalVisualizerCard(),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildNetWorthCard(),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildGrowthInsightCard(),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildMonthlyCashFlowCard(),
+                      SizedBox(height: AppSpacing.sectionGap),
+                      _buildSharedAssetsSection(),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -348,13 +350,18 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    '홍',
-                    style: AppTypography.label.copyWith(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
+                  child: Builder(builder: (context) {
+                    final user = ref.watch(authNotifierProvider).user;
+                    final name = user?['name'] as String? ?? '?';
+                    final initial = name.isNotEmpty ? name.characters.first : '?';
+                    return Text(
+                      initial,
+                      style: AppTypography.label.copyWith(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    );
+                  }),
                 ),
               ),
             ],
@@ -366,9 +373,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   // === Goal Visualizer Card ===
   Widget _buildGoalVisualizerCard() {
-    final remaining = _repo.goalAmount - _repo.currentNetWorth;
+    final remaining = _repo.goalAmount - _dashboard!.netWorth;
     final range = _repo.goalAmount - _repo.goalStartAmount;
-    final progress = _repo.currentNetWorth - _repo.goalStartAmount;
+    final progress = _dashboard!.netWorth - _repo.goalStartAmount;
     final fraction = range > 0
         ? (progress / range).clamp(0.0, 1.0)
         : 0.0;
@@ -535,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       SizedBox(width: AppSpacing.sm),
                       Text(
-                        formatKoreanWon(_repo.currentNetWorth),
+                        formatKoreanWon(_dashboard!.netWorth),
                         style: AppTypography.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -601,14 +608,14 @@ class _HomeScreenState extends State<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatKoreanWon(_repo.currentNetWorth),
+                formatKoreanWon(_dashboard!.netWorth),
                 style: AppTypography.amountLarge,
               ),
               SizedBox(width: AppSpacing.sm),
               Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: AlChangeIndicator.percent(
-                  percent: netWorthChangePercent,
+                  percent: 0, // TODO: 전월 데이터 API 추가 후 계산
                 ),
               ),
             ],
@@ -617,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen>
           AlStatRow(
             dotColor: AppColors.blue600,
             label: '총 자산',
-            value: formatKoreanWon(_repo.totalAssets),
+            value: formatKoreanWon(_dashboard!.totalAssets),
             valueColor: AppColors.blue600,
             backgroundColor: AppColors.blue50,
           ),
@@ -625,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen>
           AlStatRow(
             dotColor: AppColors.red600,
             label: '총 부채',
-            value: formatKoreanWon(_repo.totalDebts),
+            value: formatKoreanWon(_dashboard!.totalDebts),
             valueColor: AppColors.red600,
             backgroundColor: AppColors.red50,
           ),
@@ -670,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 SizedBox(height: AppSpacing.xs),
                 Text(
-                  '+${formatKoreanWon(netWorthGrowth)}',
+                  '+${formatKoreanWon(0)}', // TODO: 전월 데이터 API 추가 후 계산
                   style: AppTypography.amountMedium.copyWith(
                     color: Colors.white,
                   ),
@@ -690,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AlSectionHeader(
-            title: '${_repo.currentMonth} 현금 흐름',
+            title: '${DateTime.now().month}월 현금 흐름',
             actionLabel: '상세보기',
             onAction: () => context.go('/cashflow'),
           ),
@@ -704,7 +711,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text('수입', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_repo.monthlyIncome),
+                      formatKoreanWon(_dashboard!.monthlyIncome),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.emerald600,
                       ),
@@ -719,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text('지출', style: AppTypography.bodySmall),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_repo.monthlyExpense),
+                      formatKoreanWon(_dashboard!.monthlyExpense),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.red600,
                       ),
@@ -734,17 +741,17 @@ class _HomeScreenState extends State<HomeScreen>
           ClipRRect(
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
-              value: cashFlowRatio.clamp(0, 1),
+              value: (_dashboard!.monthlyIncome > 0 ? _dashboard!.monthlyExpense / _dashboard!.monthlyIncome : 0.0).clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.gray200,
               valueColor: AlwaysStoppedAnimation<Color>(
-                cashFlowRatio > 1 ? AppColors.red600 : AppColors.emerald500,
+                _dashboard!.monthlyExpense > _dashboard!.monthlyIncome ? AppColors.red600 : AppColors.emerald500,
               ),
             ),
           ),
           SizedBox(height: AppSpacing.sm),
           Text(
-            '지출 비율: ${(cashFlowRatio * 100).round()}%',
+            '지출 비율: ${_dashboard!.monthlyIncome > 0 ? (_dashboard!.monthlyExpense / _dashboard!.monthlyIncome * 100).round() : 0}%',
             style: AppTypography.caption,
           ),
         ],
