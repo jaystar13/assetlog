@@ -1,18 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 
 import '../config/env.dart';
+import '../core/providers.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/radius.dart';
 
-class LoginScreen extends ConsumerWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  bool _isLoading = false;
+
+  Future<void> _launchOAuth(String provider) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await FlutterWebAuth2.authenticate(
+        url: '${Env.apiBaseUrl}/auth/$provider',
+        callbackUrlScheme: 'assetlog',
+      );
+
+      final uri = Uri.parse(result);
+      final accessToken = uri.queryParameters['access_token'];
+      final refreshToken = uri.queryParameters['refresh_token'];
+
+      if (accessToken != null && refreshToken != null) {
+        await ref.read(authNotifierProvider.notifier).handleAuthCallback(
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+            );
+      }
+    } catch (_) {
+      // 사용자가 인앱 브라우저를 닫은 경우
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -72,6 +107,7 @@ class LoginScreen extends ConsumerWidget {
           textColor: AppColors.gray800,
           borderColor: AppColors.gray200,
           icon: const _GoogleIcon(),
+          isLoading: _isLoading,
           onPressed: () => _launchOAuth('google'),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -80,6 +116,7 @@ class LoginScreen extends ConsumerWidget {
           backgroundColor: const Color(0xFFFEE500),
           textColor: const Color(0xFF191919),
           icon: const _KakaoIcon(),
+          isLoading: _isLoading,
           onPressed: () => _launchOAuth('kakao'),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -88,6 +125,7 @@ class LoginScreen extends ConsumerWidget {
           backgroundColor: const Color(0xFF03C75A),
           textColor: Colors.white,
           icon: const _NaverIcon(),
+          isLoading: _isLoading,
           onPressed: () => _launchOAuth('naver'),
         ),
       ],
@@ -101,11 +139,6 @@ class LoginScreen extends ConsumerWidget {
       textAlign: TextAlign.center,
     );
   }
-
-  void _launchOAuth(String provider) {
-    final url = Uri.parse('${Env.apiBaseUrl}/auth/$provider');
-    launchUrl(url, mode: LaunchMode.externalApplication);
-  }
 }
 
 // ─── Social Login Button ────────────────────────────────────
@@ -116,6 +149,7 @@ class _SocialLoginButton extends StatelessWidget {
   final Color textColor;
   final Color? borderColor;
   final Widget icon;
+  final bool isLoading;
   final VoidCallback onPressed;
 
   const _SocialLoginButton({
@@ -124,6 +158,7 @@ class _SocialLoginButton extends StatelessWidget {
     required this.textColor,
     this.borderColor,
     required this.icon,
+    this.isLoading = false,
     required this.onPressed,
   });
 
@@ -133,7 +168,7 @@ class _SocialLoginButton extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: OutlinedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: backgroundColor,
           side: BorderSide(color: borderColor ?? backgroundColor),
@@ -171,54 +206,23 @@ class _GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double s = size.width;
-    // Simplified Google "G" logo
     final paint = Paint()..style = PaintingStyle.fill;
 
-    // Blue arc (top-right)
     paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, s, s),
-      -0.5,
-      -2.2,
-      true,
-      paint,
-    );
+    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), -0.5, -2.2, true, paint);
 
-    // Green arc (bottom-right)
     paint.color = const Color(0xFF34A853);
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, s, s),
-      1.7,
-      -1.2,
-      true,
-      paint,
-    );
+    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), 1.7, -1.2, true, paint);
 
-    // Yellow arc (bottom-left)
     paint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, s, s),
-      2.9,
-      -1.2,
-      true,
-      paint,
-    );
+    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), 2.9, -1.2, true, paint);
 
-    // Red arc (top-left)
     paint.color = const Color(0xFFEA4335);
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, s, s),
-      -3.58,
-      -1.2,
-      true,
-      paint,
-    );
+    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), -3.58, -1.2, true, paint);
 
-    // White center
     paint.color = Colors.white;
     canvas.drawCircle(Offset(s / 2, s / 2), s * 0.3, paint);
 
-    // Blue bar (right side)
     paint.color = const Color(0xFF4285F4);
     canvas.drawRect(Rect.fromLTWH(s * 0.48, s * 0.38, s * 0.52, s * 0.24), paint);
   }

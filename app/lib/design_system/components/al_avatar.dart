@@ -5,10 +5,14 @@ import '../tokens/typography.dart';
 /// 공통 프로필 아바타 컴포넌트
 ///
 /// emerald 그라데이션 원형 배경 위에 텍스트(이름 첫 글자 또는 이모지)를 표시합니다.
+/// [imageUrl]이 제공되면 네트워크 이미지를 표시합니다.
 /// [AlAvatar.small] (32), [AlAvatar.medium] (44), [AlAvatar.large] (80) 프리셋 제공.
 class AlAvatar extends StatelessWidget {
   /// 아바타 안에 표시할 텍스트 (이름 첫 글자 또는 이모지)
   final String text;
+
+  /// 네트워크 이미지 URL (프로필 사진)
+  final String? imageUrl;
 
   /// 아바타 크기 (width = height)
   final double size;
@@ -25,6 +29,7 @@ class AlAvatar extends StatelessWidget {
   const AlAvatar({
     super.key,
     required this.text,
+    this.imageUrl,
     this.size = 44,
     this.fontSize,
     this.showShadow = false,
@@ -35,6 +40,7 @@ class AlAvatar extends StatelessWidget {
   const AlAvatar.small({
     super.key,
     required this.text,
+    this.imageUrl,
     this.gradientColors,
   })  : size = 32,
         fontSize = 14,
@@ -44,6 +50,7 @@ class AlAvatar extends StatelessWidget {
   const AlAvatar.medium({
     super.key,
     required this.text,
+    this.imageUrl,
     this.gradientColors,
   })  : size = 44,
         fontSize = 20,
@@ -53,6 +60,7 @@ class AlAvatar extends StatelessWidget {
   const AlAvatar.large({
     super.key,
     required this.text,
+    this.imageUrl,
     this.gradientColors,
   })  : size = 80,
         fontSize = 32,
@@ -68,11 +76,19 @@ class AlAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
-        ),
+        gradient: imageUrl == null
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors,
+              )
+            : null,
+        image: imageUrl != null
+            ? DecorationImage(
+                image: NetworkImage(imageUrl!),
+                fit: BoxFit.cover,
+              )
+            : null,
         boxShadow: showShadow
             ? [
                 BoxShadow(
@@ -84,13 +100,15 @@ class AlAvatar extends StatelessWidget {
             : null,
       ),
       alignment: Alignment.center,
-      child: Text(
-        text,
-        style: AppTypography.heading3.copyWith(
-          color: Colors.white,
-          fontSize: effectiveFontSize,
-        ),
-      ),
+      child: imageUrl == null
+          ? Text(
+              text,
+              style: AppTypography.heading3.copyWith(
+                color: Colors.white,
+                fontSize: effectiveFontSize,
+              ),
+            )
+          : null,
     );
   }
 }

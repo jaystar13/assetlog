@@ -70,6 +70,42 @@ class AuthService {
     }
   }
 
+  /// GET /users/me/goal — 목표 조회
+  Future<Map<String, dynamic>?> getGoal() async {
+    try {
+      final response = await _dio.get('/users/me/goal');
+      final body = response.data;
+      if (body is Map<String, dynamic> && body.containsKey('data')) {
+        return body['data'] as Map<String, dynamic>?;
+      }
+      return body as Map<String, dynamic>?;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// PUT /users/me/goal — 목표 설정/수정
+  Future<Map<String, dynamic>> upsertGoal({
+    required int startAmount,
+    required int targetAmount,
+    required String deadline,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/users/me/goal',
+        data: {
+          'startAmount': startAmount,
+          'targetAmount': targetAmount,
+          'deadline': deadline,
+        },
+      );
+      return _unwrap(response);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// 백엔드 응답 래퍼 {data, meta}에서 data 추출
   Map<String, dynamic> _unwrap(Response response) {
     final body = response.data;

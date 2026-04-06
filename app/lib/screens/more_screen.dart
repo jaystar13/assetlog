@@ -140,6 +140,7 @@ class MoreScreen extends ConsumerWidget {
     final user = authState.user;
     final name = user?['name'] as String? ?? '사용자';
     final email = user?['email'] as String? ?? '';
+    final avatar = user?['avatar'] as String?;
     final initial = name.isNotEmpty ? name.characters.first : '?';
 
     return GestureDetector(
@@ -147,7 +148,7 @@ class MoreScreen extends ConsumerWidget {
       child: AlCard(
         child: Row(
           children: [
-            AlAvatar.medium(text: initial),
+            AlAvatar.medium(text: initial, imageUrl: avatar),
             SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(

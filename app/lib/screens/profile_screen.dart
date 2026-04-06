@@ -120,11 +120,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildProfileHeader(Map<String, dynamic>? user) {
     final name = user?['name'] as String? ?? '사용자';
     final email = user?['email'] as String? ?? '';
+    final avatar = user?['avatar'] as String?;
     final initial = name.isNotEmpty ? name.characters.first : '?';
 
     return Column(
       children: [
-        AlAvatar.large(text: initial),
+        AlAvatar.large(text: initial, imageUrl: avatar),
         SizedBox(height: AppSpacing.lg),
         Text(name, style: AppTypography.heading2),
         SizedBox(height: AppSpacing.xs),

@@ -176,7 +176,29 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         ],
                       ),
                       SizedBox(height: AppSpacing.md),
-                      ...filtered.map(_buildTransactionItem),
+                      if (filtered.isEmpty)
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(LucideIcons.inbox, size: 48, color: AppColors.gray300),
+                                SizedBox(height: AppSpacing.md),
+                                Text(
+                                  '거래 내역이 없습니다',
+                                  style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500),
+                                ),
+                                SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  '수기 입력 또는 명세서 가져오기로 추가해 보세요',
+                                  style: AppTypography.caption.copyWith(color: AppColors.gray400),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        ...filtered.map(_buildTransactionItem),
                     ],
                   ),
                 );

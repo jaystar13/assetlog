@@ -80,7 +80,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   DailyQuote get _todayQuote {
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final dayOfYear = DateTime.now()
+        .difference(DateTime(DateTime.now().year, 1, 1))
+        .inDays;
     return _quotes[dayOfYear % _quotes.length];
   }
 
@@ -93,10 +95,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.emerald50,
-            Colors.white,
-          ],
+          colors: [AppColors.emerald50, Colors.white],
         ),
         borderRadius: AppRadius.mdAll,
         border: Border.all(color: AppColors.emerald100),
@@ -104,11 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            LucideIcons.quote,
-            size: 20,
-            color: AppColors.emerald400,
-          ),
+          Icon(LucideIcons.quote, size: 20, color: AppColors.emerald400),
           SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -150,7 +145,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           maxLength: 20,
           decoration: InputDecoration(
             hintText: '나만의 한 줄 소개를 입력하세요',
-            hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.gray400),
+            hintStyle: AppTypography.bodyMedium.copyWith(
+              color: AppColors.gray400,
+            ),
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: AppColors.emerald600),
             ),
@@ -177,9 +174,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   HomeDashboard? _dashboard;
 
   void _showGoalSettingSheet() {
-    _goalStartController.text = _repo.goalStartAmount.toString();
-    _goalAmountController.text = _repo.goalAmount.toString();
-    _goalDeadlineController.text = _repo.goalDeadline;
+    final goal = _dashboard?.goal;
+    _goalStartController.text = goal?.startAmount.toString() ?? '';
+    _goalAmountController.text = goal?.targetAmount.toString() ?? '';
+    _goalDeadlineController.text = goal?.deadline ?? '';
 
     AlBottomSheet.show(
       context: context,
@@ -187,10 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '자산 목표를 설정하고 달성률을 추적하세요.',
-            style: AppTypography.bodyMedium,
-          ),
+          Text('자산 목표를 설정하고 달성률을 추적하세요.', style: AppTypography.bodyMedium),
           SizedBox(height: AppSpacing.xl),
           AlInput(
             label: '시작 금액',
@@ -229,9 +224,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           SizedBox(height: AppSpacing.xl),
           AlButton(
             label: '저장',
-            onPressed: () {
+            onPressed: () async {
+              final startAmount = int.tryParse(_goalStartController.text);
+              final targetAmount = int.tryParse(_goalAmountController.text);
+              final deadline = _goalDeadlineController.text.trim();
+
+              if (startAmount == null || targetAmount == null || deadline.isEmpty) {
+                showErrorSnackBar(context, '모든 항목을 입력해 주세요');
+                return;
+              }
+
               Navigator.of(context).pop();
-              showSuccessSnackBar(context, '목표가 설정되었습니다');
+
+              await ref.read(homeNotifierProvider.notifier).saveGoal(
+                    startAmount: startAmount,
+                    targetAmount: targetAmount,
+                    deadline: deadline,
+                  );
+              if (mounted) showSuccessSnackBar(context, '목표가 설정되었습니다');
             },
           ),
         ],
@@ -256,7 +266,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               children: [
                 _buildHeader(),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.screenPadding,
+                  ),
                   child: Column(
                     children: [
                       SizedBox(height: AppSpacing.lg),
@@ -310,7 +322,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   children: [
                     Text(
                       'Asset Log',
-                      style: AppTypography.heading1.copyWith(color: Colors.white),
+                      style: AppTypography.heading1.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
                     SizedBox(height: AppSpacing.xs),
                     GestureDetector(
@@ -338,30 +352,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               GestureDetector(
                 onTap: () => context.push('/more/profile'),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.2),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Builder(builder: (context) {
+                child: Builder(
+                  builder: (context) {
                     final user = ref.watch(authNotifierProvider).user;
+                    final avatar = user?['avatar'] as String?;
                     final name = user?['name'] as String? ?? '?';
-                    final initial = name.isNotEmpty ? name.characters.first : '?';
-                    return Text(
-                      initial,
-                      style: AppTypography.label.copyWith(
-                        color: Colors.white,
-                        fontSize: 16,
+                    final initial = name.isNotEmpty
+                        ? name.characters.first
+                        : '?';
+
+                    return Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
+                        image: avatar != null
+                            ? DecorationImage(
+                                image: NetworkImage(avatar),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
+                      alignment: Alignment.center,
+                      child: avatar == null
+                          ? Text(
+                              initial,
+                              style: AppTypography.label.copyWith(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            )
+                          : null,
                     );
-                  }),
+                  },
                 ),
               ),
             ],
@@ -373,12 +401,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // === Goal Visualizer Card ===
   Widget _buildGoalVisualizerCard() {
-    final remaining = _repo.goalAmount - _dashboard!.netWorth;
-    final range = _repo.goalAmount - _repo.goalStartAmount;
-    final progress = _dashboard!.netWorth - _repo.goalStartAmount;
-    final fraction = range > 0
-        ? (progress / range).clamp(0.0, 1.0)
-        : 0.0;
+    final goal = _dashboard!.goal;
+    final goalStart = goal?.startAmount ?? 0;
+    final goalTarget = goal?.targetAmount ?? 0;
+    final remaining = goalTarget - _dashboard!.netWorth;
+    final range = goalTarget - goalStart;
+    final progress = _dashboard!.netWorth - goalStart;
+    final fraction = range > 0 ? (progress / range).clamp(0.0, 1.0) : 0.0;
 
     return AlCard(
       child: Column(
@@ -414,14 +443,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(LucideIcons.flag, size: 12, color: AppColors.gray500),
+                                  Icon(
+                                    LucideIcons.flag,
+                                    size: 12,
+                                    color: AppColors.gray500,
+                                  ),
                                   SizedBox(width: 3),
                                   Text('시작', style: AppTypography.caption),
                                 ],
                               ),
-                              Text(formatKoreanWon(_repo.goalStartAmount), style: AppTypography.bodySmall.copyWith(
-                                fontWeight: FontWeight.w600,
-                              )),
+                              Text(
+                                formatKoreanWon(goalStart),
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -435,17 +471,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(LucideIcons.target, size: 12, color: AppColors.emerald600),
-                                  SizedBox(width: 3),
-                                  Text('목표', style: AppTypography.caption.copyWith(
+                                  Icon(
+                                    LucideIcons.target,
+                                    size: 12,
                                     color: AppColors.emerald600,
-                                  )),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    '목표',
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.emerald600,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              Text(formatKoreanWon(_repo.goalAmount), style: AppTypography.bodySmall.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.emerald600,
-                              )),
+                              Text(
+                                formatKoreanWon(goalTarget),
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.emerald600,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -503,7 +549,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.emerald600.withValues(alpha: 0.3),
+                                      color: AppColors.emerald600.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -587,7 +635,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // 기한 표시
           Center(
             child: Text(
-              '목표 기한: ${_repo.goalDeadline}',
+              '목표 기한: ${goal?.deadline ?? '-'}',
               style: AppTypography.caption,
             ),
           ),
@@ -658,11 +706,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: AppRadius.mdAll,
             ),
-            child: Icon(
-              LucideIcons.trendingUp,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: Icon(LucideIcons.trendingUp, color: Colors.white, size: 24),
           ),
           SizedBox(width: AppSpacing.lg),
           Expanded(
@@ -741,11 +785,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ClipRRect(
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
-              value: (_dashboard!.monthlyIncome > 0 ? _dashboard!.monthlyExpense / _dashboard!.monthlyIncome : 0.0).clamp(0.0, 1.0),
+              value:
+                  (_dashboard!.monthlyIncome > 0
+                          ? _dashboard!.monthlyExpense /
+                                _dashboard!.monthlyIncome
+                          : 0.0)
+                      .clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.gray200,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _dashboard!.monthlyExpense > _dashboard!.monthlyIncome ? AppColors.red600 : AppColors.emerald500,
+                _dashboard!.monthlyExpense > _dashboard!.monthlyIncome
+                    ? AppColors.red600
+                    : AppColors.emerald500,
               ),
             ),
           ),
@@ -829,7 +880,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ],
                 ),
               ),
-              Icon(LucideIcons.chevronRight, size: 18, color: AppColors.gray400),
+              Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: AppColors.gray400,
+              ),
             ],
           ),
           SizedBox(height: AppSpacing.lg),
@@ -865,7 +920,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             child: Row(
               children: [
-                Icon(LucideIcons.shieldCheck, size: 14, color: AppColors.emerald600),
+                Icon(
+                  LucideIcons.shieldCheck,
+                  size: 14,
+                  color: AppColors.emerald600,
+                ),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -910,11 +969,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildSharedStatDivider() {
-    return Container(
-      width: 1,
-      height: 32,
-      color: AppColors.gray200,
-    );
+    return Container(width: 1, height: 32, color: AppColors.gray200);
   }
-
 }
