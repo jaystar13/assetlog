@@ -17,8 +17,13 @@ class ApiException implements Exception {
       case DioExceptionType.badResponse:
         final statusCode = e.response?.statusCode;
         final data = e.response?.data;
-        final serverMessage =
-            data is Map<String, dynamic> ? data['message'] as String? : null;
+        final rawMessage =
+            data is Map<String, dynamic> ? data['message'] : null;
+        final serverMessage = rawMessage is String
+            ? rawMessage
+            : rawMessage is List
+                ? rawMessage.join(', ')
+                : null;
         return ApiException(
           statusCode: statusCode,
           message: serverMessage ?? '요청 처리 중 오류가 발생했습니다.',

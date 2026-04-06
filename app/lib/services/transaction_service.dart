@@ -78,6 +78,26 @@ class TransactionService {
     }
   }
 
+  /// POST /import/transactions — 카드 명세서 일괄 업로드
+  Future<Map<String, dynamic>> importTransactions({
+    required String cardCompany,
+    required String targetMonth,
+    required String filePath,
+    required String fileName,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'cardCompany': cardCompany,
+        'targetMonth': targetMonth,
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      });
+      final response = await _dio.post('/import/transactions', data: formData);
+      return _unwrap(response);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   Map<String, dynamic> _unwrap(Response response) {
     final body = response.data;
     if (body is Map<String, dynamic> && body.containsKey('data')) {

@@ -18,6 +18,7 @@ import '../models/models.dart';
 import '../core/notifiers/home_notifier.dart';
 import '../core/providers.dart';
 import '../repositories/repositories.dart';
+import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/user_preferences.dart';
@@ -197,6 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             controller: _goalStartController,
             keyboardType: TextInputType.number,
+            inputFormatters: [CurrencyInputFormatter()],
           ),
           SizedBox(height: AppSpacing.lg),
           AlInput(
@@ -209,6 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             controller: _goalAmountController,
             keyboardType: TextInputType.number,
+            inputFormatters: [CurrencyInputFormatter()],
           ),
           SizedBox(height: AppSpacing.lg),
           AlInput(
@@ -225,8 +228,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           AlButton(
             label: '저장',
             onPressed: () async {
-              final startAmount = int.tryParse(_goalStartController.text);
-              final targetAmount = int.tryParse(_goalAmountController.text);
+              final startAmount = CurrencyInputFormatter.parse(_goalStartController.text);
+              final targetAmount = CurrencyInputFormatter.parse(_goalAmountController.text);
               final deadline = _goalDeadlineController.text.trim();
 
               if (startAmount == null || targetAmount == null || deadline.isEmpty) {

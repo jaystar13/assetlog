@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../tokens/colors.dart';
 import '../tokens/typography.dart';
 import '../tokens/spacing.dart';
@@ -10,6 +11,7 @@ class AlInput extends StatelessWidget {
   final Widget? prefixIcon;
   final TextEditingController? controller;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
   final bool required;
   final int maxLines;
@@ -21,6 +23,7 @@ class AlInput extends StatelessWidget {
     this.prefixIcon,
     this.controller,
     this.keyboardType,
+    this.inputFormatters,
     this.onChanged,
     this.required = false,
     this.maxLines = 1,
@@ -46,6 +49,7 @@ class AlInput extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           maxLines: maxLines,
           onChanged: onChanged,
           style: AppTypography.bodyLarge,

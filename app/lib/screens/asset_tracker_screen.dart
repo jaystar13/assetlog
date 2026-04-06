@@ -16,6 +16,7 @@ import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/asset_notifier.dart';
+import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 
@@ -127,6 +128,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 placeholder: '금액을 입력하세요',
                 controller: valueController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
               ),
               SizedBox(height: AppSpacing.xl),
@@ -148,7 +150,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     return;
                   }
 
-                  final value = num.tryParse(valueText);
+                  final value = CurrencyInputFormatter.parse(valueText);
                   if (value == null) {
                     showErrorSnackBar(context, '올바른 금액을 입력해 주세요');
                     return;
@@ -232,6 +234,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 placeholder: '금액을 입력하세요',
                 controller: valueController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
               ),
               SizedBox(height: AppSpacing.xl),
@@ -253,7 +256,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     return;
                   }
 
-                  final value = num.tryParse(valueText);
+                  final value = CurrencyInputFormatter.parse(valueText);
                   if (value == null) {
                     showErrorSnackBar(context, '올바른 금액을 입력해 주세요');
                     return;
@@ -331,6 +334,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                         placeholder: '새 금액을 입력하세요',
                         controller: controllers[item.id],
                         keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                       ),
                     ],
                   ),

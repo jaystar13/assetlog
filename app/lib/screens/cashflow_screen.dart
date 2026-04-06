@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../design_system/tokens/colors.dart';
@@ -15,7 +16,9 @@ import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/transaction_notifier.dart';
+import '../core/providers.dart';
 import '../repositories/repositories.dart';
+import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
 
@@ -96,9 +99,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         initialData: tx.toMap(),
         onSubmit: (updated) async {
           Navigator.of(context).pop();
+          final payload = Map<String, dynamic>.from(updated)
+            ..remove('id')
+            ..remove('editedBy');
           await ref.read(transactionNotifierProvider(_monthKey).notifier).updateTransaction(
             tx.id,
-            updated,
+            payload,
           );
           if (mounted) showSuccessSnackBar(context, '거래가 수정되었습니다');
         },
@@ -106,17 +112,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  void _showDeleteConfirmDialog(Transaction tx) {
-    AlConfirmDialog.show(
-      context: context,
-      title: '거래 삭제',
-      message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-      onConfirm: () async {
-        await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
-        if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
-      },
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -336,6 +332,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
   void _showImportSheet() {
     String? selectedCardId;
+    String? selectedFilePath;
+    String? selectedFileName;
+    bool isUploading = false;
 
     AlBottomSheet.show(
       context: context,
@@ -487,12 +486,39 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                       SizedBox(height: AppSpacing.md),
 
                       // 파일 선택 버튼
+                      if (selectedFileName != null)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(LucideIcons.fileCheck, size: 14, color: AppColors.emerald600),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  selectedFileName!,
+                                  style: AppTypography.bodySmall.copyWith(color: AppColors.emerald700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       Material(
                         color: AppColors.emerald600,
                         borderRadius: AppRadius.smAll,
                         child: InkWell(
-                          onTap: () {
-                            // TODO: 파일 선택 구현 (file_picker 패키지)
+                          onTap: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.custom,
+                              allowedExtensions: ['xls', 'xlsx', 'csv'],
+                            );
+                            if (result != null && result.files.single.path != null) {
+                              setSheetState(() {
+                                selectedFilePath = result.files.single.path;
+                                selectedFileName = result.files.single.name;
+                              });
+                            }
                           },
                           borderRadius: AppRadius.smAll,
                           splashColor: AppColors.emerald700,
@@ -507,7 +533,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                                 Icon(LucideIcons.file, size: 14, color: Colors.white),
                                 SizedBox(width: 6),
                                 Text(
-                                  '파일 선택',
+                                  selectedFileName != null ? '다른 파일 선택' : '파일 선택',
                                   style: AppTypography.bodySmall.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -543,6 +569,39 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     ],
                   ),
                 ),
+
+                // ── 업로드 버튼 ──
+                if (selectedFilePath != null) ...[
+                  SizedBox(height: AppSpacing.xl),
+                  AlButton(
+                    label: isUploading ? '업로드 중...' : '업로드',
+                    icon: isUploading
+                        ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Icon(LucideIcons.upload, size: 18, color: Colors.white),
+                    onPressed: isUploading
+                        ? () {}
+                        : () async {
+                            setSheetState(() => isUploading = true);
+                            try {
+                              final result = await ref.read(transactionServiceProvider).importTransactions(
+                                    cardCompany: selectedCardId!,
+                                    targetMonth: _monthKey,
+                                    filePath: selectedFilePath!,
+                                    fileName: selectedFileName!,
+                                  );
+                              final count = result['importedCount'] ?? result['count'] ?? 0;
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                ref.invalidate(transactionNotifierProvider(_monthKey));
+                                showSuccessSnackBar(context, '$count건의 거래가 가져와졌습니다');
+                              }
+                            } catch (e) {
+                              setSheetState(() => isUploading = false);
+                              if (mounted) showErrorSnackBar(context, '업로드 실패: $e');
+                            }
+                          },
+                  ),
+                ],
               ],
             ],
           );
@@ -653,65 +712,85 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     final isIncome = tx.type == TransactionType.income;
     final amount = tx.amount;
 
-    return GestureDetector(
+    return Dismissible(
       key: ValueKey(tx.id),
-      onTap: () => _showEditEntrySheet(tx),
-      onLongPress: () => _showDeleteConfirmDialog(tx),
-      child: Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.sm),
-      child: AlCard(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        bool confirmed = false;
+        await AlConfirmDialog.show(
+          context: context,
+          title: '거래 삭제',
+          message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+          onConfirm: () => confirmed = true,
+        );
+        return confirmed;
+      },
+      onDismissed: (_) async {
+        await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
+        if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+      },
+      background: Container(
+        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: AppColors.red600,
+          borderRadius: AppRadius.lgAll,
         ),
-        child: Row(
-          children: [
-            // Left: name, category badge, subcategory, date
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tx.name, style: AppTypography.bodyLarge),
-                  SizedBox(height: AppSpacing.xs),
-                  Row(
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: AppSpacing.xl),
+        child: Icon(LucideIcons.trash2, color: Colors.white, size: 20),
+      ),
+      child: GestureDetector(
+        onTap: () => _showEditEntrySheet(tx),
+        child: Container(
+          margin: EdgeInsets.only(bottom: AppSpacing.sm),
+          child: AlCard(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AlBadge.category(tx.category),
-                      SizedBox(width: AppSpacing.sm),
-                      Text(
-                        tx.subCategory,
-                        style: AppTypography.bodySmall,
+                      Text(tx.name, style: AppTypography.bodyLarge),
+                      SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          AlBadge.category(tx.category),
+                          SizedBox(width: AppSpacing.sm),
+                          Text(tx.subCategory, style: AppTypography.bodySmall),
+                        ],
+                      ),
+                      SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption),
+                          if (tx.editedBy != null) ...[
+                            SizedBox(width: AppSpacing.sm),
+                            _buildEditorBadge(tx.editedBy!),
+                          ],
+                        ],
                       ),
                     ],
                   ),
-                  SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      Text(tx.date, style: AppTypography.caption),
-                      if (tx.editedBy != null) ...[
-                        SizedBox(width: AppSpacing.sm),
-                        _buildEditorBadge(tx.editedBy!),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Right: amount + change
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
-                  style: AppTypography.amountSmall.copyWith(
-                    color: isIncome ? AppColors.green600 : AppColors.red600,
-                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
+                      style: AppTypography.amountSmall.copyWith(
+                        color: isIncome ? AppColors.green600 : AppColors.red600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -853,7 +932,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       return;
     }
 
-    final amount = int.tryParse(amountText);
+    final amount = CurrencyInputFormatter.parse(amountText);
     if (amount == null || amount <= 0) {
       showErrorSnackBar(context, '올바른 금액을 입력해 주세요');
       return;
@@ -938,6 +1017,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           placeholder: '금액을 입력하세요',
           controller: _amountController,
           keyboardType: TextInputType.number,
+          inputFormatters: [CurrencyInputFormatter()],
           prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
         ),
         SizedBox(height: AppSpacing.lg),
