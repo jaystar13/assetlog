@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpsertGoalDto } from './dto/upsert-goal.dto';
 
 @Injectable()
 export class UsersService {
@@ -28,5 +29,27 @@ export class UsersService {
 
   async remove(id: string) {
     await this.prisma.user.delete({ where: { id } });
+  }
+
+  // ─────────────────────── Financial Goal ───────────────────────
+
+  async getGoal(userId: string) {
+    return this.prisma.financialGoal.findUnique({
+      where: { userId },
+    });
+  }
+
+  async upsertGoal(userId: string, dto: UpsertGoalDto) {
+    const data = {
+      startAmount: BigInt(Math.round(dto.startAmount)),
+      targetAmount: BigInt(Math.round(dto.targetAmount)),
+      deadline: new Date(dto.deadline + 'T00:00:00.000Z'),
+    };
+
+    return this.prisma.financialGoal.upsert({
+      where: { userId },
+      create: { userId, ...data },
+      update: data,
+    });
   }
 }

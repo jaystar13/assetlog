@@ -13,6 +13,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
+    // 에러 로깅
+    if (exception instanceof HttpException) {
+      const res = exception.getResponse();
+      console.error(`[${exception.getStatus()}]`, typeof res === 'string' ? res : JSON.stringify(res));
+    } else {
+      console.error('Unhandled exception:', exception);
+    }
+
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
