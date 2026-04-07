@@ -7,12 +7,15 @@ class AssetService {
 
   AssetService(this._dio);
 
-  /// GET /assets?status=active|closed|all
-  Future<List<Map<String, dynamic>>> getAssets({String status = 'active'}) async {
+  /// GET /assets?status=active|closed|all&month=YYYY-MM
+  Future<List<Map<String, dynamic>>> getAssets({String status = 'active', String? month}) async {
     try {
       final response = await _dio.get(
         '/assets',
-        queryParameters: {'status': status},
+        queryParameters: {
+          'status': status,
+          if (month != null) 'month': month,
+        },
       );
       return _unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {

@@ -1,18 +1,16 @@
+import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/asset_item.dart';
 import '../../models/asset_group.dart';
 import '../../models/enums.dart';
-import '../../services/asset_service.dart';
 import '../providers.dart';
 
-class AssetNotifier extends AutoDisposeAsyncNotifier<List<AssetGroup>> {
-  late AssetService _service;
-
+class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, String> {
   @override
-  Future<List<AssetGroup>> build() async {
-    _service = ref.watch(assetServiceProvider);
-    final rawAssets = await _service.getAssets();
+  Future<List<AssetGroup>> build(String month) async {
+    final service = ref.watch(assetServiceProvider);
+    final rawAssets = await service.getAssets(month: month);
     return _groupAssets(rawAssets);
   }
 
@@ -30,7 +28,7 @@ class AssetNotifier extends AutoDisposeAsyncNotifier<List<AssetGroup>> {
         id: raw['id'] as String,
         name: raw['name'] as String,
         currentValue: latestValue,
-        previousValue: 0, // 단일 히스토리만 가져오므로 이전값 없음
+        previousValue: 0,
         lastUpdated: history.isNotEmpty
             ? history.first['month'] as String
             : '',
@@ -54,8 +52,22 @@ class AssetNotifier extends AutoDisposeAsyncNotifier<List<AssetGroup>> {
   Future<void> addAsset({
     required String categoryId,
     required String name,
+    int? initialValue,
   }) async {
-    await _service.createAsset(categoryId: categoryId, name: name);
+    final service = ref.read(assetServiceProvider);
+    final created = await service.createAsset(categoryId: categoryId, name: name);
+    final assetId = created['id'] as String;
+    developer.log('Asset created: $assetId, initialValue: $initialValue', name: 'AssetNotifier');
+
+    if (initialValue != null && initialValue != 0) {
+      try {
+        await service.upsertHistory(assetId: assetId, month: arg, value: initialValue);
+        developer.log('History saved: $assetId/$arg = $initialValue', name: 'AssetNotifier');
+      } catch (e) {
+        developer.log('History save FAILED: $e', name: 'AssetNotifier');
+      }
+    }
+
     ref.invalidateSelf();
   }
 
@@ -64,21 +76,19 @@ class AssetNotifier extends AutoDisposeAsyncNotifier<List<AssetGroup>> {
     required String month,
     required int value,
   }) async {
-    await _service.upsertHistory(
-      assetId: assetId,
-      month: month,
-      value: value,
-    );
+    final service = ref.read(assetServiceProvider);
+    await service.upsertHistory(assetId: assetId, month: month, value: value);
     ref.invalidateSelf();
   }
 
   Future<void> deleteAsset(String id) async {
-    await _service.deleteAsset(id);
+    final service = ref.read(assetServiceProvider);
+    await service.deleteAsset(id);
     ref.invalidateSelf();
   }
 }
 
-final assetNotifierProvider =
-    AsyncNotifierProvider.autoDispose<AssetNotifier, List<AssetGroup>>(
+final assetNotifierProvider = AsyncNotifierProvider.autoDispose
+    .family<AssetNotifier, List<AssetGroup>, String>(
   AssetNotifier.new,
 );

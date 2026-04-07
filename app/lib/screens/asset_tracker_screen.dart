@@ -31,6 +31,9 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   DateTime _selectedMonth = DateTime.now();
   final Set<String> _expandedGroups = {};
 
+  String get _monthKey =>
+      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+
   void _toggleGroup(String id) {
     setState(() {
       if (_expandedGroups.contains(id)) {
@@ -67,7 +70,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   void _showAddAssetSheet() {
     final nameController = TextEditingController();
     final valueController = TextEditingController();
-    final groups = ref.read(assetNotifierProvider).valueOrNull ?? [];
+    final groups = ref.read(assetNotifierProvider(_monthKey)).valueOrNull ?? [];
     String selectedGroup = groups.isNotEmpty ? groups.first.id : 'cash';
 
     AlBottomSheet.show(
@@ -156,17 +159,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     return;
                   }
 
+                  final isDebt = selectedGroup == 'loans';
+                  final actualValue = isDebt ? -value.abs() : value;
+
                   Navigator.of(context).pop();
 
-                  final notifier = ref.read(assetNotifierProvider.notifier);
+                  final notifier = ref.read(assetNotifierProvider(_monthKey).notifier);
                   await notifier.addAsset(
                     categoryId: selectedGroup,
                     name: name,
+                    initialValue: actualValue,
                   );
-
-                  // 값도 함께 기록
-                  // addAsset 후 새 자산 ID를 알 수 없으므로 리프레시 후 처리
-                  // TODO: 백엔드에서 create 응답으로 ID 반환 시 upsertHistory 호출
 
                   _expandedGroups.add(selectedGroup);
                   if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
@@ -267,8 +270,8 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
                   Navigator.of(context).pop();
 
-                  final month = '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
-                  await ref.read(assetNotifierProvider.notifier).updateAssetValue(
+                  final month = _monthKey;
+                  await ref.read(assetNotifierProvider(_monthKey).notifier).updateAssetValue(
                     assetId: item.id,
                     month: month,
                     value: actualValue,
@@ -291,7 +294,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
       title: '자산 삭제',
       message: "'${item.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
       onConfirm: () async {
-        await ref.read(assetNotifierProvider.notifier).deleteAsset(item.id);
+        await ref.read(assetNotifierProvider(_monthKey).notifier).deleteAsset(item.id);
         if (mounted) showSuccessSnackBar(context, "'${item.name}' 항목이 삭제되었습니다");
       },
     );
@@ -343,7 +346,28 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
               SizedBox(height: AppSpacing.sm),
               AlButton(
                 label: '업데이트',
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () async {
+                  Navigator.of(context).pop();
+
+                  final month = _monthKey;
+                  final notifier = ref.read(assetNotifierProvider(_monthKey).notifier);
+                  final isDebt = group.id == 'loans';
+
+                  for (final item in group.items) {
+                    final text = controllers[item.id]?.text ?? '';
+                    final value = CurrencyInputFormatter.parse(text);
+                    if (value != null) {
+                      final actualValue = isDebt ? -value.abs() : value;
+                      await notifier.updateAssetValue(
+                        assetId: item.id,
+                        month: month,
+                        value: actualValue,
+                      );
+                    }
+                  }
+
+                  if (mounted) showSuccessSnackBar(context, '자산이 업데이트되었습니다');
+                },
               ),
             ],
           );
@@ -369,7 +393,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
           // Scrollable content
           Expanded(
-            child: ref.watch(assetNotifierProvider).when(
+            child: ref.watch(assetNotifierProvider(_monthKey)).when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
               data: (groups) => SingleChildScrollView(

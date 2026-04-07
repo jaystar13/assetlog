@@ -36,6 +36,59 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   // 거래 내역 필터
   TransactionType? _txFilter;
 
+  // 다중 선택 모드
+  bool _isSelectMode = false;
+  final Set<String> _selectedIds = {};
+
+  void _toggleSelectMode() {
+    setState(() {
+      _isSelectMode = !_isSelectMode;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAll(List<Transaction> filtered) {
+    setState(() {
+      if (_selectedIds.length == filtered.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.addAll(filtered.map((t) => t.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final count = _selectedIds.length;
+    AlConfirmDialog.show(
+      context: context,
+      title: '일괄 삭제',
+      message: '선택한 $count건의 거래를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+      onConfirm: () async {
+        final notifier = ref.read(transactionNotifierProvider(_monthKey).notifier);
+        for (final id in _selectedIds) {
+          await notifier.deleteTransaction(id);
+        }
+        if (mounted) {
+          setState(() {
+            _isSelectMode = false;
+            _selectedIds.clear();
+          });
+          showSuccessSnackBar(context, '$count건의 거래가 삭제되었습니다');
+        }
+      },
+    );
+  }
+
   String get _monthKey =>
       '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
@@ -99,9 +152,10 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         initialData: tx.toMap(),
         onSubmit: (updated) async {
           Navigator.of(context).pop();
-          final payload = Map<String, dynamic>.from(updated)
-            ..remove('id')
-            ..remove('editedBy');
+          const allowedFields = {'type', 'name', 'amount', 'date', 'category', 'subCategory', 'paymentMethod', 'targetMonth', 'isInstallment', 'installmentMonths', 'installmentRound'};
+          final payload = Map<String, dynamic>.fromEntries(
+            updated.entries.where((e) => allowedFields.contains(e.key)),
+          );
           await ref.read(transactionNotifierProvider(_monthKey).notifier).updateTransaction(
             tx.id,
             payload,
@@ -168,7 +222,34 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('거래 내역', style: AppTypography.heading3),
-                          _buildTxFilterSegment(),
+                          Row(
+                            children: [
+                              if (_isSelectMode && filtered.isNotEmpty) ...[
+                                GestureDetector(
+                                  onTap: () => _selectAll(filtered),
+                                  child: Text(
+                                    _selectedIds.length == filtered.length ? '전체 해제' : '전체 선택',
+                                    style: AppTypography.bodySmall.copyWith(color: AppColors.emerald600),
+                                  ),
+                                ),
+                                SizedBox(width: AppSpacing.md),
+                              ],
+                              if (filtered.isNotEmpty)
+                                GestureDetector(
+                                  onTap: _toggleSelectMode,
+                                  child: Text(
+                                    _isSelectMode ? '취소' : '선택',
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: _isSelectMode ? AppColors.gray500 : AppColors.emerald600,
+                                    ),
+                                  ),
+                                ),
+                              if (!_isSelectMode) ...[
+                                SizedBox(width: AppSpacing.md),
+                                _buildTxFilterSegment(),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                       SizedBox(height: AppSpacing.md),
@@ -195,6 +276,17 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         )
                       else
                         ...filtered.map(_buildTransactionItem),
+                      // 선택 모드 삭제 바
+                      if (_isSelectMode && _selectedIds.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: AppSpacing.lg),
+                          child: AlButton(
+                            label: '${_selectedIds.length}건 삭제',
+                            variant: AlButtonVariant.danger,
+                            icon: Icon(LucideIcons.trash2, size: 18, color: Colors.white),
+                            onPressed: _deleteSelected,
+                          ),
+                        ),
                     ],
                   ),
                 );
@@ -589,11 +681,11 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                                     filePath: selectedFilePath!,
                                     fileName: selectedFileName!,
                                   );
-                              final count = result['importedCount'] ?? result['count'] ?? 0;
+                              final count = result['imported'] ?? 0;
                               if (mounted) {
                                 Navigator.of(context).pop();
                                 ref.invalidate(transactionNotifierProvider(_monthKey));
-                                showSuccessSnackBar(context, '$count건의 거래가 가져와졌습니다');
+                                showSuccessSnackBar(context, '$count건의 내역을 업로드하였습니다');
                               }
                             } catch (e) {
                               setSheetState(() => isUploading = false);
@@ -711,6 +803,75 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   Widget _buildTransactionItem(Transaction tx) {
     final isIncome = tx.type == TransactionType.income;
     final amount = tx.amount;
+    final isSelected = _selectedIds.contains(tx.id);
+
+    Widget card = GestureDetector(
+      onTap: _isSelectMode
+          ? () => _toggleSelection(tx.id)
+          : () => _showEditEntrySheet(tx),
+      child: Container(
+        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+        child: AlCard(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              // 선택 모드: 체크박스
+              if (_isSelectMode) ...[
+                Icon(
+                  isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                  size: 22,
+                  color: isSelected ? AppColors.emerald600 : AppColors.gray300,
+                ),
+                SizedBox(width: AppSpacing.md),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tx.name, style: AppTypography.bodyLarge),
+                    SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        AlBadge.category(tx.category),
+                        SizedBox(width: AppSpacing.sm),
+                        Text(tx.subCategory, style: AppTypography.bodySmall),
+                      ],
+                    ),
+                    SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption),
+                        if (tx.editedBy != null) ...[
+                          SizedBox(width: AppSpacing.sm),
+                          _buildEditorBadge(tx.editedBy!),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
+                    style: AppTypography.amountSmall.copyWith(
+                      color: isIncome ? AppColors.green600 : AppColors.red600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // 선택 모드가 아닐 때만 스와이프 삭제
+    if (_isSelectMode) return card;
 
     return Dismissible(
       key: ValueKey(tx.id),
@@ -723,11 +884,13 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
           onConfirm: () => confirmed = true,
         );
-        return confirmed;
-      },
-      onDismissed: (_) async {
-        await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
-        if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+        if (confirmed) {
+          await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
+          if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+        }
+        // 항상 false를 반환하여 Dismissible이 직접 위젯을 제거하지 않도록 함
+        // 대신 notifier의 invalidateSelf()가 목록을 리빌드하여 자연스럽게 제거됨
+        return false;
       },
       background: Container(
         margin: EdgeInsets.only(bottom: AppSpacing.sm),
@@ -739,59 +902,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         padding: EdgeInsets.only(right: AppSpacing.xl),
         child: Icon(LucideIcons.trash2, color: Colors.white, size: 20),
       ),
-      child: GestureDetector(
-        onTap: () => _showEditEntrySheet(tx),
-        child: Container(
-          margin: EdgeInsets.only(bottom: AppSpacing.sm),
-          child: AlCard(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(tx.name, style: AppTypography.bodyLarge),
-                      SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          AlBadge.category(tx.category),
-                          SizedBox(width: AppSpacing.sm),
-                          Text(tx.subCategory, style: AppTypography.bodySmall),
-                        ],
-                      ),
-                      SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption),
-                          if (tx.editedBy != null) ...[
-                            SizedBox(width: AppSpacing.sm),
-                            _buildEditorBadge(tx.editedBy!),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
-                      style: AppTypography.amountSmall.copyWith(
-                        color: isIncome ? AppColors.green600 : AppColors.red600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: card,
     );
   }
 
@@ -957,10 +1068,12 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           _selectedPaymentMethod == PaymentMethod.bankTransfer;
       if (isCreditCard) {
         entry['paymentMethod'] = _selectedCreditCard.value;
-        entry['isInstallment'] = _isInstallment.toString();
+        entry['isInstallment'] = _isInstallment;
         if (_isInstallment) {
-          entry['installmentMonths'] = _installmentMonthsController.text.trim();
-          entry['installmentRound'] = _installmentRoundController.text.trim();
+          final months = int.tryParse(_installmentMonthsController.text.trim());
+          final round = int.tryParse(_installmentRoundController.text.trim());
+          if (months != null) entry['installmentMonths'] = months;
+          if (round != null) entry['installmentRound'] = round;
         }
       } else {
         entry['paymentMethod'] = _selectedPaymentMethod.value;
