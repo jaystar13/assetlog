@@ -104,8 +104,11 @@ model Transaction {
   category       String
   subCategory    String   @map("sub_category")
   paymentMethod  String?  @map("payment_method") // 결제수단 (카드사명 또는 계좌이체/현금 등)
-  targetMonth    String?  @map("target_month")   // 귀속월 "YYYY-MM" (카드 명세서 임포트 시 사용자가 지정)
-  editedByUserId String?  @map("edited_by_user_id")
+  targetMonth       String?  @map("target_month")       // 귀속월 "YYYY-MM" (카드 명세서 임포트 시 사용자가 지정)
+  isInstallment     Boolean  @default(false) @map("is_installment")
+  installmentMonths Int?     @map("installment_months") // 할부 기간 (개월)
+  installmentRound  Int?     @map("installment_round")  // 현재 회차
+  editedByUserId    String?  @map("edited_by_user_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

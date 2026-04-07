@@ -27,8 +27,13 @@ export class AssetsController {
   @Get()
   @ApiOperation({ summary: '내 자산 목록 조회 (기본: active만)' })
   @ApiQuery({ name: 'status', required: false, enum: ['active', 'closed', 'all'], example: 'active' })
-  findAll(@CurrentUser('id') userId: string, @Query('status') status?: string) {
-    return this.assetsService.findAll(userId, status === 'all' ? undefined : status);
+  @ApiQuery({ name: 'month', required: false, description: '기준 월 (YYYY-MM) — 해당 월 이하의 최신 값 반환', example: '2026-04' })
+  findAll(
+    @CurrentUser('id') userId: string,
+    @Query('status') status?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.assetsService.findAll(userId, status === 'all' ? undefined : status, month);
   }
 
   @Post()

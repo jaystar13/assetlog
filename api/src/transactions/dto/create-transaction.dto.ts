@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { ALL_PAYMENT_METHODS } from '../../common/constants/payment-method.constants';
 
 export const TRANSACTION_TYPES = ['income', 'expense'] as const;
@@ -58,4 +58,21 @@ export class CreateTransactionDto {
   @IsOptional()
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/, { message: 'targetMonth는 YYYY-MM 형식이어야 합니다.' })
   targetMonth?: string;
+
+  @ApiPropertyOptional({ example: false, description: '할부 여부' })
+  @IsOptional()
+  @IsBoolean()
+  isInstallment?: boolean;
+
+  @ApiPropertyOptional({ example: 3, description: '할부 기간 (개월)' })
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  installmentMonths?: number;
+
+  @ApiPropertyOptional({ example: 1, description: '현재 할부 회차' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  installmentRound?: number;
 }

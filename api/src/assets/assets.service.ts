@@ -10,13 +10,19 @@ export class AssetsService {
 
   // ─────────────────────── 목록 조회 ───────────────────────
 
-  findAll(userId: string, status?: string) {
+  findAll(userId: string, status?: string, month?: string) {
     return this.prisma.asset.findMany({
       where: {
         userId,
         ...(status ? { status } : { status: 'active' }),
       },
-      include: { valueHistory: { orderBy: { month: 'desc' }, take: 1 } },
+      include: {
+        valueHistory: {
+          where: month ? { month: { lte: month } } : undefined,
+          orderBy: { month: 'desc' },
+          take: 1,
+        },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }

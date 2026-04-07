@@ -66,6 +66,9 @@ export class TransactionsService {
         subCategory: dto.subCategory,
         paymentMethod: dto.paymentMethod ?? null,
         targetMonth: dto.targetMonth ?? null,
+        isInstallment: dto.isInstallment ?? false,
+        installmentMonths: dto.installmentMonths ?? null,
+        installmentRound: dto.installmentRound ?? null,
       },
     });
   }
@@ -86,6 +89,9 @@ export class TransactionsService {
         ...(dto.subCategory && { subCategory: dto.subCategory }),
         ...(dto.paymentMethod !== undefined && { paymentMethod: dto.paymentMethod }),
         ...(dto.targetMonth !== undefined && { targetMonth: dto.targetMonth }),
+        ...(dto.isInstallment !== undefined && { isInstallment: dto.isInstallment }),
+        ...(dto.installmentMonths !== undefined && { installmentMonths: dto.installmentMonths }),
+        ...(dto.installmentRound !== undefined && { installmentRound: dto.installmentRound }),
         editedByUserId: userId,
       },
     });
