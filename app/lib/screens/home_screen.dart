@@ -281,8 +281,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       SizedBox(height: AppSpacing.sectionGap),
                       _buildNetWorthCard(),
                       SizedBox(height: AppSpacing.sectionGap),
-                      _buildGrowthInsightCard(),
-                      SizedBox(height: AppSpacing.sectionGap),
                       _buildMonthlyCashFlowCard(),
                       SizedBox(height: AppSpacing.sectionGap),
                       _buildSharedAssetsSection(),
@@ -666,7 +664,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: AlChangeIndicator.percent(
-                  percent: 0, // TODO: 전월 데이터 API 추가 후 계산
+                  percent: _dashboard!.netWorthChangePercent,
                 ),
               ),
             ],
@@ -687,51 +685,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             valueColor: AppColors.red600,
             backgroundColor: AppColors.red50,
           ),
-        ],
-      ),
-    );
-  }
-
-  // === Growth Insight Card ===
-  Widget _buildGrowthInsightCard() {
-    return AlCard(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [AppColors.emerald500, AppColors.teal500],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: AppRadius.mdAll,
-            ),
-            child: Icon(LucideIcons.trendingUp, color: Colors.white, size: 24),
-          ),
-          SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '지난달 대비 성장',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: Colors.white.withValues(alpha: 0.85),
+          if (_dashboard!.lastMonthNetWorth != null) ...[
+            SizedBox(height: AppSpacing.lg),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald50 : AppColors.red50,
+                borderRadius: AppRadius.smAll,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _dashboard!.netWorthGrowth >= 0 ? LucideIcons.trendingUp : LucideIcons.trendingDown,
+                    size: 16,
+                    color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald600 : AppColors.red600,
                   ),
-                ),
-                SizedBox(height: AppSpacing.xs),
-                Text(
-                  '+${formatKoreanWon(0)}', // TODO: 전월 데이터 API 추가 후 계산
-                  style: AppTypography.amountMedium.copyWith(
-                    color: Colors.white,
+                  SizedBox(width: AppSpacing.sm),
+                  Text(
+                    '전월 대비 ${_dashboard!.netWorthGrowth >= 0 ? '+' : ''}${formatKoreanWon(_dashboard!.netWorthGrowth)}',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald700 : AppColors.red700,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -5,6 +5,7 @@ import '../../models/asset_item.dart';
 import '../../models/asset_group.dart';
 import '../../models/enums.dart';
 import '../providers.dart';
+import 'home_notifier.dart';
 
 class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, String> {
   @override
@@ -68,7 +69,7 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
       }
     }
 
-    ref.invalidateSelf();
+    _invalidateAll();
   }
 
   Future<void> updateAssetValue({
@@ -78,13 +79,24 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
   }) async {
     final service = ref.read(assetServiceProvider);
     await service.upsertHistory(assetId: assetId, month: month, value: value);
-    ref.invalidateSelf();
+    _invalidateAll();
+  }
+
+  Future<void> closeAsset(String id) async {
+    final service = ref.read(assetServiceProvider);
+    await service.closeAsset(id);
+    _invalidateAll();
   }
 
   Future<void> deleteAsset(String id) async {
     final service = ref.read(assetServiceProvider);
     await service.deleteAsset(id);
+    _invalidateAll();
+  }
+
+  void _invalidateAll() {
     ref.invalidateSelf();
+    ref.invalidate(homeNotifierProvider);
   }
 }
 

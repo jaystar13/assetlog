@@ -36,6 +36,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   // 거래 내역 필터
   TransactionType? _txFilter;
 
+  // 카드 사용 내역 펼침
+  bool _showCardUsage = false;
+
   // 다중 선택 모드
   bool _isSelectMode = false;
   final Set<String> _selectedIds = {};
@@ -208,7 +211,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: AppSpacing.lg),
-                      _buildMonthlySummaryCard(income: income, expense: expense, balance: balance, expenseRatio: expenseRatio),
+                      _buildMonthlySummaryCard(income: income, expense: expense, balance: balance, expenseRatio: expenseRatio, transactions: transactions),
                       SizedBox(height: AppSpacing.sectionGap),
                       _buildSmartImportCard(),
                       SizedBox(height: AppSpacing.lg),
@@ -344,7 +347,25 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     required int expense,
     required int balance,
     required double expenseRatio,
+    required List<Transaction> transactions,
   }) {
+    // 카드 사용 내역 집계
+    final cardTxs = transactions.where(
+      (t) => t.type == TransactionType.expense && t.paymentMethod != null && t.paymentMethod!.contains('카드'),
+    ).toList();
+    final Map<String, int> byCard = {};
+    for (final tx in cardTxs) {
+      byCard[tx.paymentMethod!] = (byCard[tx.paymentMethod!] ?? 0) + tx.amount;
+    }
+    final sortedCards = byCard.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final cardTotal = sortedCards.fold<int>(0, (sum, e) => sum + e.value);
+    final hasCardData = sortedCards.isNotEmpty;
+
+    final cardColors = [
+      AppColors.blue600, AppColors.emerald500, AppColors.purple600,
+      Color(0xFFF59E0B), AppColors.teal500, AppColors.red600,
+    ];
+
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +373,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           Text('월간 요약', style: AppTypography.heading3),
           SizedBox(height: AppSpacing.lg),
 
-          // Income vs Expense row
           Row(
             children: [
               Expanded(
@@ -363,9 +383,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(income),
-                      style: AppTypography.amountMedium.copyWith(
-                        color: AppColors.green600,
-                      ),
+                      style: AppTypography.amountMedium.copyWith(color: AppColors.green600),
                     ),
                   ],
                 ),
@@ -378,9 +396,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(expense),
-                      style: AppTypography.amountMedium.copyWith(
-                        color: AppColors.red600,
-                      ),
+                      style: AppTypography.amountMedium.copyWith(color: AppColors.red600),
                     ),
                   ],
                 ),
@@ -389,7 +405,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           ),
           SizedBox(height: AppSpacing.lg),
 
-          // Progress bar
           ClipRRect(
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
@@ -401,7 +416,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           ),
           SizedBox(height: AppSpacing.md),
 
-          // Balance
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -409,13 +423,85 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               Text(
                 formatKoreanWon(balance),
                 style: AppTypography.amountSmall.copyWith(
-                  color: balance >= 0
-                      ? AppColors.emerald600
-                      : AppColors.red600,
+                  color: balance >= 0 ? AppColors.emerald600 : AppColors.red600,
                 ),
               ),
             ],
           ),
+
+          // 카드 사용 내역 토글
+          if (hasCardData) ...[
+            SizedBox(height: AppSpacing.md),
+            GestureDetector(
+              onTap: () => setState(() => _showCardUsage = !_showCardUsage),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.gray100)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.credit_card, size: 14, color: AppColors.gray500),
+                    SizedBox(width: AppSpacing.xs),
+                    Text(
+                      _showCardUsage ? '카드 사용 내역 접기' : '카드 사용 내역 보기',
+                      style: AppTypography.caption.copyWith(color: AppColors.gray500),
+                    ),
+                    SizedBox(width: AppSpacing.xs),
+                    Icon(
+                      _showCardUsage ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                      size: 14, color: AppColors.gray500,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: SizedBox.shrink(),
+              secondChild: Padding(
+                padding: EdgeInsets.only(top: AppSpacing.md),
+                child: Column(
+                  children: [
+                    ...sortedCards.asMap().entries.map((e) {
+                      final idx = e.key;
+                      final entry = e.value;
+                      final pct = cardTotal > 0 ? entry.value / cardTotal : 0.0;
+                      final color = cardColors[idx % cardColors.length];
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: Row(
+                          children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            SizedBox(width: AppSpacing.sm),
+                            Expanded(child: Text(entry.key, style: AppTypography.bodySmall)),
+                            Text(formatKoreanWon(entry.value), style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                            SizedBox(width: AppSpacing.sm),
+                            SizedBox(
+                              width: 32,
+                              child: Text('${(pct * 100).round()}%', style: AppTypography.caption.copyWith(color: AppColors.gray500), textAlign: TextAlign.right),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    Divider(height: 1, color: AppColors.gray100),
+                    SizedBox(height: AppSpacing.sm),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('카드 합계', style: AppTypography.label.copyWith(fontSize: 12)),
+                        Text(formatKoreanWon(cardTotal), style: AppTypography.label.copyWith(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              crossFadeState: _showCardUsage ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: Duration(milliseconds: 250),
+            ),
+          ],
         ],
       ),
     );
@@ -838,6 +924,24 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         AlBadge.category(tx.category),
                         SizedBox(width: AppSpacing.sm),
                         Text(tx.subCategory, style: AppTypography.bodySmall),
+                        if (tx.paymentMethod != null && tx.paymentMethod!.contains('카드')) ...[
+                          SizedBox(width: AppSpacing.sm),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.blue50,
+                              borderRadius: AppRadius.fullAll,
+                            ),
+                            child: Text(
+                              tx.paymentMethod!,
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 10,
+                                color: AppColors.blue600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     SizedBox(height: AppSpacing.xs),

@@ -1,27 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
-import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_section_header.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
+import '../core/providers.dart';
 import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 
-class OverviewScreen extends StatefulWidget {
+class OverviewScreen extends ConsumerStatefulWidget {
   const OverviewScreen({super.key});
 
   @override
-  State<OverviewScreen> createState() => _OverviewScreenState();
+  ConsumerState<OverviewScreen> createState() => _OverviewScreenState();
 }
 
-class _OverviewScreenState extends State<OverviewScreen> {
+class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   final _allData = OverviewRepository().getMonthlyData();
   PeriodFilter _selectedPeriod = PeriodFilter.sixMonths;
+
+  /// 선택된 기간의 월 키 목록 (YYYY-MM)
+  List<String> get _periodMonthKeys {
+    final now = DateTime.now();
+    final count = _selectedPeriod == PeriodFilter.sixMonths ? 6 : 12;
+    return List.generate(count, (i) {
+      final d = DateTime(now.year, now.month - (count - 1 - i));
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+    });
+  }
 
   List<MonthlyData> get _data {
     if (_selectedPeriod == PeriodFilter.sixMonths) {
@@ -60,10 +71,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Key metrics
-                  _buildKeyMetrics(),
-                  SizedBox(height: AppSpacing.sectionGap),
-
                   // Net worth trend
                   _buildNetWorthTrendCard(),
                   SizedBox(height: AppSpacing.sectionGap),
@@ -130,49 +137,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  // -----------------------------------------------------------------------
-  // Key metrics (2-col grid)
-  // -----------------------------------------------------------------------
-
-  Widget _buildKeyMetrics() {
-    return Row(
-      children: [
-        Expanded(
-          child: AlCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('순자산', style: AppTypography.labelSmall),
-                SizedBox(height: AppSpacing.sm),
-                Text('20.9억', style: AppTypography.amountMedium),
-                SizedBox(height: AppSpacing.xs),
-                AlChangeIndicator.percent(percent: 1.7),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: AlCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('저축률', style: AppTypography.labelSmall),
-                SizedBox(height: AppSpacing.sm),
-                Text('36.1%', style: AppTypography.amountMedium),
-                SizedBox(height: AppSpacing.xs),
-                AlChangeIndicator(
-                  value: '2.4%p',
-                  isPositive: false,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -320,60 +284,130 @@ class _OverviewScreenState extends State<OverviewScreen> {
   // 2) Income vs Expense - Grouped Bar Chart (emerald + red)
   // -----------------------------------------------------------------------
 
-  Widget _buildIncomeExpenseCard() {
-    final groups = _data.asMap().entries.map((e) {
-      return BarChartGroupData(
-        x: e.key,
-        barsSpace: 4,
-        barRods: [
-          BarChartRodData(
-            toY: e.value.income,
-            color: AppColors.emerald500,
-            width: 12,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
-            ),
-          ),
-          BarChartRodData(
-            toY: e.value.expense,
-            color: AppColors.red600,
-            width: 12,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
-            ),
-          ),
-        ],
-      );
-    }).toList();
+  // 카테고리별 색상
+  static const _expenseCategoryColors = {
+    '생활비': Color(0xFFF59E0B),
+    '필수비': AppColors.blue600,
+    '선택비': AppColors.purple600,
+    '투자비': AppColors.teal500,
+  };
 
-    return _chartCard(
-      title: '수입 vs 지출',
-      legend: _buildLegend([
-        _LegendItem('수입', AppColors.emerald500),
-        _LegendItem('지출', AppColors.red600),
-      ]),
-      chart: BarChart(
-        BarChartData(
-          barGroups: groups,
-          gridData: _defaultGrid,
-          borderData: _noBorder,
-          titlesData: _baseTitles(),
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => AppColors.gray800,
-              getTooltipItem: (group, groupIdx, rod, rodIdx) {
-                final label = rodIdx == 0 ? '수입' : '지출';
-                return BarTooltipItem(
-                  '$label ${formatChartWon(rod.toY)}',
-                  TextStyle(color: Colors.white, fontSize: 12),
-                );
-              },
+  Widget _buildIncomeExpenseCard() {
+    final months = _periodMonthKeys;
+    final txService = ref.watch(transactionServiceProvider);
+
+    return FutureBuilder<List<List<Transaction>>>(
+      future: Future.wait(months.map((m) => txService.getTransactions(month: m))),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _chartCard(
+            title: '수입 vs 지출',
+            chart: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final allMonthsTx = snapshot.data!;
+        final categoryOrder = ['생활비', '필수비', '선택비', '투자비'];
+
+        final groups = <BarChartGroupData>[];
+        for (int i = 0; i < months.length; i++) {
+          final txs = allMonthsTx[i];
+          final income = txs
+              .where((t) => t.type == TransactionType.income)
+              .fold<double>(0, (sum, t) => sum + t.amount);
+
+          // 지출 카테고리별
+          final Map<String, double> byCat = {};
+          for (final tx in txs.where((t) => t.type == TransactionType.expense)) {
+            byCat[tx.category] = (byCat[tx.category] ?? 0) + tx.amount;
+          }
+
+          double stackFrom = 0;
+          final stacks = <BarChartRodStackItem>[];
+          for (final cat in categoryOrder) {
+            final val = byCat[cat] ?? 0;
+            if (val > 0) {
+              stacks.add(BarChartRodStackItem(
+                stackFrom, stackFrom + val,
+                _expenseCategoryColors[cat] ?? AppColors.gray400,
+              ));
+              stackFrom += val;
+            }
+          }
+
+          groups.add(BarChartGroupData(
+            x: i,
+            barsSpace: 2,
+            barRods: [
+              BarChartRodData(
+                toY: income,
+                color: AppColors.emerald500,
+                width: 10,
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(3), topRight: Radius.circular(3)),
+              ),
+              BarChartRodData(
+                toY: stackFrom,
+                rodStackItems: stacks,
+                color: stacks.isEmpty ? AppColors.gray200 : null,
+                width: 10,
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(3), topRight: Radius.circular(3)),
+              ),
+            ],
+          ));
+        }
+
+        return _chartCard(
+          title: '수입 vs 지출',
+          legend: _buildLegend([
+            _LegendItem('수입', AppColors.emerald500),
+            ...categoryOrder.map((c) => _LegendItem(c, _expenseCategoryColors[c] ?? AppColors.gray400)),
+          ]),
+          chart: BarChart(
+            BarChartData(
+              barGroups: groups,
+              gridData: _defaultGrid,
+              borderData: _noBorder,
+              titlesData: FlTitlesData(
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx < 0 || idx >= months.length) return SizedBox.shrink();
+                      return Padding(
+                        padding: EdgeInsets.only(top: AppSpacing.sm),
+                        child: Text(formatMonth(months[idx]), style: AppTypography.caption),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 48,
+                    getTitlesWidget: (value, meta) => Text(formatChartWon(value), style: AppTypography.caption),
+                  ),
+                ),
+              ),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => AppColors.gray800,
+                  getTooltipItem: (group, groupIdx, rod, rodIdx) {
+                    final label = rodIdx == 0 ? '수입' : '지출';
+                    return BarTooltipItem(
+                      '$label ${formatChartWon(rod.toY)}',
+                      TextStyle(color: Colors.white, fontSize: 12),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

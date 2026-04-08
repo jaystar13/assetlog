@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/enums.dart';
+import '../../models/transaction.dart';
 import '../providers.dart';
 
 class FinancialGoal {
@@ -24,6 +26,7 @@ class HomeDashboard {
   final num totalAssets;
   final num totalDebts;
   final num netWorth;
+  final num? lastMonthNetWorth;
   final int monthlyIncome;
   final int monthlyExpense;
   final FinancialGoal? goal;
@@ -32,10 +35,19 @@ class HomeDashboard {
     required this.totalAssets,
     required this.totalDebts,
     required this.netWorth,
+    this.lastMonthNetWorth,
     required this.monthlyIncome,
     required this.monthlyExpense,
     this.goal,
   });
+
+  num get netWorthGrowth =>
+      lastMonthNetWorth != null ? netWorth - lastMonthNetWorth! : 0;
+
+  double get netWorthChangePercent {
+    if (lastMonthNetWorth == null || lastMonthNetWorth == 0) return 0;
+    return (netWorthGrowth / lastMonthNetWorth!.abs()) * 100;
+  }
 }
 
 class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
@@ -46,57 +58,69 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final authService = ref.watch(authServiceProvider);
 
     final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-    // 병렬 호출
+    // 전월 계산
+    final lastMonthDate = DateTime(now.year, now.month - 1);
+    final lastMonth = '${lastMonthDate.year}-${lastMonthDate.month.toString().padLeft(2, '0')}';
+
+    // 병렬 호출: 당월 자산, 전월 자산, 당월 거래, 목표
     final results = await Future.wait([
-      assetService.getAssets(),
-      txService.getTransactions(month: month),
+      assetService.getAssets(month: currentMonth),
+      assetService.getAssets(month: lastMonth),
+      txService.getTransactions(month: currentMonth),
       authService.getGoal(),
     ]);
 
-    final assets = results[0] as List<Map<String, dynamic>>;
-    final transactions = results[1];
-    final goalData = results[2] as Map<String, dynamic>?;
+    final currentAssets = results[0] as List<Map<String, dynamic>>;
+    final lastMonthAssets = results[1] as List<Map<String, dynamic>>;
+    final transactions = results[2] as List<Transaction>;
+    final goalData = results[3] as Map<String, dynamic>?;
 
-    // 자산 합계
-    num totalAssets = 0;
-    num totalDebts = 0;
-    for (final asset in assets) {
-      final history = asset['valueHistory'] as List<dynamic>? ?? [];
-      final value = history.isNotEmpty ? (history.first['value'] as num) : 0;
-      final categoryId = asset['categoryId'] as String;
-      if (categoryId == 'loans') {
-        totalDebts += value.abs();
-      } else {
-        totalAssets += value;
-      }
-    }
+    // 당월 자산 합계
+    final currentTotals = _calcAssetTotals(currentAssets);
 
-    // 월간 수입/지출
-    final txList = transactions as List<dynamic>;
+    // 전월 자산 합계
+    final lastTotals = _calcAssetTotals(lastMonthAssets);
+    final lastMonthNetWorth = lastTotals.assets - lastTotals.debts;
+
+    // 월간 수입/지출 — Transaction 객체로 반환됨
     int income = 0;
     int expense = 0;
-    for (final tx in txList) {
-      if (tx is Map<String, dynamic>) {
-        final type = tx['type'] as String?;
-        final amount = (tx['amount'] as num?)?.toInt() ?? 0;
-        if (type == 'income') {
-          income += amount;
-        } else {
-          expense += amount;
-        }
+    for (final tx in transactions) {
+      if (tx.type == TransactionType.income) {
+        income += tx.amount;
+      } else {
+        expense += tx.amount;
       }
     }
 
     return HomeDashboard(
-      totalAssets: totalAssets,
-      totalDebts: totalDebts,
-      netWorth: totalAssets - totalDebts,
+      totalAssets: currentTotals.assets,
+      totalDebts: currentTotals.debts,
+      netWorth: currentTotals.assets - currentTotals.debts,
+      lastMonthNetWorth: lastMonthNetWorth != 0 ? lastMonthNetWorth : null,
       monthlyIncome: income,
       monthlyExpense: expense,
       goal: goalData != null ? FinancialGoal.fromJson(goalData) : null,
     );
+  }
+
+  ({num assets, num debts}) _calcAssetTotals(List<Map<String, dynamic>> rawAssets) {
+    num assets = 0;
+    num debts = 0;
+    for (final asset in rawAssets) {
+      final history = asset['valueHistory'] as List<dynamic>? ?? [];
+      if (history.isEmpty) continue;
+      final value = (history.first['value'] as num);
+      final categoryId = asset['categoryId'] as String;
+      if (categoryId == 'loans') {
+        debts += value.abs();
+      } else {
+        assets += value;
+      }
+    }
+    return (assets: assets, debts: debts);
   }
 
   Future<void> saveGoal({

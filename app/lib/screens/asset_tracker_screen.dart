@@ -287,16 +287,70 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
     );
   }
 
-  // ─── 개별 자산 삭제 확인 다이얼로그 ─────────────────────────────────
-  void _showDeleteAssetDialog(AssetItem item, AssetGroup group) {
-    AlConfirmDialog.show(
+  // ─── 개별 자산 액션 시트 (종료/삭제) ─────────────────────────────────
+  void _showAssetActionSheet(AssetItem item, AssetGroup group) {
+    showModalBottomSheet(
       context: context,
-      title: '자산 삭제',
-      message: "'${item.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-      onConfirm: () async {
-        await ref.read(assetNotifierProvider(_monthKey).notifier).deleteAsset(item.id);
-        if (mounted) showSuccessSnackBar(context, "'${item.name}' 항목이 삭제되었습니다");
-      },
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.sheetTop),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenPadding,
+                  vertical: AppSpacing.md,
+                ),
+                child: Text(item.name, style: AppTypography.heading3),
+              ),
+              ListTile(
+                leading: Icon(LucideIcons.archive, color: AppColors.gray600),
+                title: Text('자산 종료', style: AppTypography.bodyLarge),
+                subtitle: Text(
+                  '목록에서 숨기고 히스토리는 보존합니다',
+                  style: AppTypography.caption,
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  AlConfirmDialog.show(
+                    context: context,
+                    title: '자산 종료',
+                    message: "'${item.name}'을(를) 종료하시겠습니까?\n히스토리는 보존되며, 목록에서 숨겨집니다.",
+                    confirmLabel: '종료',
+                    isDestructive: false,
+                    onConfirm: () async {
+                      await ref.read(assetNotifierProvider(_monthKey).notifier).closeAsset(item.id);
+                      if (mounted) showSuccessSnackBar(context, "'${item.name}'이(가) 종료되었습니다");
+                    },
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(LucideIcons.trash2, color: AppColors.red600),
+                title: Text('자산 삭제', style: AppTypography.bodyLarge.copyWith(color: AppColors.red600)),
+                subtitle: Text(
+                  '자산과 모든 히스토리를 완전히 삭제합니다',
+                  style: AppTypography.caption,
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  AlConfirmDialog.show(
+                    context: context,
+                    title: '자산 삭제',
+                    message: "'${item.name}'과(와) 모든 히스토리를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                    onConfirm: () async {
+                      await ref.read(assetNotifierProvider(_monthKey).notifier).deleteAsset(item.id);
+                      if (mounted) showSuccessSnackBar(context, "'${item.name}'이(가) 삭제되었습니다");
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -658,7 +712,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   Widget _buildAssetItem(AssetItem item, AssetGroup group) {
     return GestureDetector(
       onTap: () => _showEditAssetSheet(item, group),
-      onLongPress: () => _showDeleteAssetDialog(item, group),
+      onLongPress: () => _showAssetActionSheet(item, group),
       child: Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.cardPadding,

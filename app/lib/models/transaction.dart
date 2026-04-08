@@ -8,6 +8,7 @@ class Transaction {
   final String date;
   final String category;
   final String subCategory;
+  final String? paymentMethod;
   final String? editedBy;
 
   const Transaction({
@@ -18,6 +19,7 @@ class Transaction {
     required this.date,
     required this.category,
     required this.subCategory,
+    this.paymentMethod,
     this.editedBy,
   });
 
@@ -30,6 +32,7 @@ class Transaction {
         'date': date,
         'category': category,
         'subCategory': subCategory,
+        'paymentMethod': paymentMethod,
         'editedBy': editedBy,
       };
 
@@ -37,10 +40,11 @@ class Transaction {
         id: map['id'] as String,
         type: TransactionType.fromString(map['type'] as String),
         name: map['name'] as String,
-        amount: map['amount'] as int,
+        amount: (map['amount'] as num).toInt(),
         date: map['date'] as String,
         category: map['category'] as String,
         subCategory: map['subCategory'] as String,
+        paymentMethod: map['paymentMethod'] as String?,
         editedBy: map['editedBy'] as String?,
       );
 }

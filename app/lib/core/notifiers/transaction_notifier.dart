@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/transaction.dart';
 import '../../services/transaction_service.dart';
 import '../providers.dart';
+import 'home_notifier.dart';
 
 class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transaction>, String> {
   late TransactionService _service;
@@ -33,17 +34,22 @@ class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transactio
       paymentMethod: paymentMethod,
       targetMonth: targetMonth,
     );
-    ref.invalidateSelf();
+    _invalidateAll();
   }
 
   Future<void> updateTransaction(String id, Map<String, dynamic> data) async {
     await _service.updateTransaction(id, data);
-    ref.invalidateSelf();
+    _invalidateAll();
   }
 
   Future<void> deleteTransaction(String id) async {
     await _service.deleteTransaction(id);
+    _invalidateAll();
+  }
+
+  void _invalidateAll() {
     ref.invalidateSelf();
+    ref.invalidate(homeNotifierProvider);
   }
 }
 
