@@ -111,8 +111,8 @@ enum AssetCategoryType {
 // ─── Period Filter ───────────────────────────────────────────────────────────
 
 enum PeriodFilter {
-  sixMonths('6m', '6개월'),
-  twelveMonths('12m', '12개월');
+  threeMonths('3m', '3개월'),
+  sixMonths('6m', '6개월');
 
   const PeriodFilter(this.value, this.label);
   final String value;
