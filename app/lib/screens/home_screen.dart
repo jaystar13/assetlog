@@ -37,7 +37,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   final _prefs = UserPreferences();
   final _repo = HomeRepository();
-  late final List<SharedAssetInfo> _sharedAssets;
   late final List<DailyQuote> _quotes;
 
   // Goal setting controllers
@@ -48,7 +47,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _sharedAssets = _repo.getSharedAssets();
     _quotes = _repo.getQuotes();
     _prefs.addListener(_onPrefsChanged);
 
@@ -796,6 +794,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // === Shared Assets Section ===
   Widget _buildSharedAssetsSection() {
+    final sharedAssets = _dashboard!.sharedAssets;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -805,7 +805,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           onAction: () => context.go('/more/access'),
         ),
         SizedBox(height: AppSpacing.md),
-        if (_sharedAssets.isEmpty)
+        if (sharedAssets.isEmpty)
           AlCard(
             child: Center(
               child: Padding(
@@ -826,25 +826,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           )
         else
-          ..._sharedAssets.map(_buildSharedAssetCard),
+          ...sharedAssets.map(_buildSharedAssetCard),
       ],
     );
   }
 
-  Widget _buildSharedAssetCard(SharedAssetInfo shared) {
+  Widget _buildSharedAssetCard(SharedAssetSummary shared) {
     final totalAssets = shared.totalAssets;
-    final totalDebt = shared.totalDebt;
+    final totalDebt = shared.totalDebts;
     final netWorth = shared.netWorth;
 
-    return AlCard(
+    return GestureDetector(
+      onTap: () => context.push('/shared-asset/${shared.accessId}', extra: {
+        'ownerName': shared.ownerName,
+        'ownerAvatar': shared.ownerAvatar,
+        'cashflowPermission': shared.cashflowPermission,
+        'assetPermissions': shared.assetPermissions,
+      }),
+      child: AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더: 아바타 + 이름 + 업데이트일
+          // 헤더: 아바타 + 이름 + 이메일
           Row(
             children: [
               AlAvatar.medium(
-                text: shared.ownerAvatar,
+                text: shared.ownerName.isNotEmpty ? shared.ownerName.characters.first : '?',
+                imageUrl: shared.ownerAvatar,
                 gradientColors: [AppColors.emerald400, AppColors.teal500],
               ),
               SizedBox(width: AppSpacing.md),
@@ -858,7 +866,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                     SizedBox(height: 2),
                     Text(
-                      '${shared.lastUpdated} 업데이트',
+                      shared.ownerEmail,
                       style: AppTypography.caption,
                     ),
                   ],
@@ -912,7 +920,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    shared.permissions,
+                    _buildPermissionSummary(shared),
                     style: AppTypography.caption.copyWith(
                       color: AppColors.emerald700,
                     ),
@@ -923,10 +931,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ],
       ),
+    ),
     );
   }
 
-  Widget _buildSharedStat(String label, int value, Color color) {
+  String _buildPermissionSummary(SharedAssetSummary shared) {
+    final parts = <String>[];
+    if (shared.cashflowPermission != 'none') {
+      parts.add('수입/지출: ${shared.cashflowPermission == 'edit' ? '편집' : '보기'}');
+    }
+    final assetParts = shared.assetPermissions.entries
+        .where((e) => e.value != 'none')
+        .map((e) {
+          final catName = {'real-estate': '부동산', 'stocks': '주식', 'cash': '현금', 'loans': '부채'}[e.key] ?? e.key;
+          return '$catName ${e.value == 'edit' ? '편집' : '보기'}';
+        });
+    if (assetParts.isNotEmpty) parts.add('자산: ${assetParts.join(', ')}');
+    return parts.isEmpty ? '권한 없음' : parts.join(' · ');
+  }
+
+  Widget _buildSharedStat(String label, num value, Color color) {
     String formatted;
     if (value >= 100000000) {
       final billions = value / 100000000;

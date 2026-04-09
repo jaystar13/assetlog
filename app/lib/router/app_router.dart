@@ -11,6 +11,7 @@ import '../screens/shared_access_screen.dart';
 import '../screens/more_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/shared_asset_detail_screen.dart';
 import '../widgets/bottom_nav.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -34,6 +35,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/shared-asset/:id',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return SharedAssetDetailScreen(
+            accessId: state.pathParameters['id']!,
+            ownerName: extra['ownerName'] as String,
+            ownerAvatar: extra['ownerAvatar'] as String?,
+            cashflowPermission: extra['cashflowPermission'] as String,
+            assetPermissions: (extra['assetPermissions'] as Map).cast<String, String>(),
+          );
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../design_system/tokens/colors.dart';
@@ -12,36 +13,34 @@ import '../design_system/components/al_input.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
+import '../core/providers.dart';
 import '../repositories/repositories.dart';
 import '../utils/snackbar_helper.dart';
 
 // ─── Screen ──────────────────────────────────────────────────────────────
 
-class SharedAccessScreen extends StatefulWidget {
+class SharedAccessScreen extends ConsumerStatefulWidget {
   const SharedAccessScreen({super.key});
 
   @override
-  State<SharedAccessScreen> createState() => _SharedAccessScreenState();
+  ConsumerState<SharedAccessScreen> createState() => _SharedAccessScreenState();
 }
 
-class _SharedAccessScreenState extends State<SharedAccessScreen>
+class _SharedAccessScreenState extends ConsumerState<SharedAccessScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _repo = SharedAccessRepository();
-  late List<AssetSubCategory> _assetSubCategories;
-  late List<SharedUser> _users;
-  late List<Invitation> _sentInvitations;
-  late List<Invitation> _receivedInvitations;
+  final _assetSubCategories = SharedAccessRepository().getAssetSubCategories();
+  List<SharedUser> _users = [];
+  List<Invitation> _sentInvitations = [];
+  List<Invitation> _receivedInvitations = [];
   bool _defaultPublic = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _assetSubCategories = _repo.getAssetSubCategories();
-    _users = _repo.getSharedUsers();
-    _sentInvitations = _repo.getSentInvitations();
-    _receivedInvitations = _repo.getReceivedInvitations();
+    _loadData();
   }
 
   @override
@@ -50,63 +49,156 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
     super.dispose();
   }
 
-  // ─── Permission helpers ────────────────────────────────────────────────
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final service = ref.read(sharedAccessServiceProvider);
+      final results = await Future.wait([
+        service.getOwnedShares(),
+        service.getSentInvitations(),
+        service.getReceivedInvitations(),
+      ]);
 
-  void _cyclePermission(SharedUser user, String type, [String? subCategoryId]) {
-    setState(() {
-      if (type == 'cashflow') {
-        user.cashflowPermission = user.cashflowPermission.next();
-      } else if (type == 'asset' && subCategoryId != null) {
-        final current = user.assetPermissions[subCategoryId] ?? PermissionLevel.none;
-        user.assetPermissions[subCategoryId] = current.next();
+      final ownedShares = results[0];
+      final sentInvs = results[1];
+      final receivedInvs = results[2];
+
+      if (mounted) {
+        setState(() {
+          _users = ownedShares.map(_parseSharedUser).toList();
+          _sentInvitations = sentInvs.map((inv) => _parseInvitation(inv, isIncoming: false)).toList();
+          _receivedInvitations = receivedInvs.map((inv) => _parseInvitation(inv, isIncoming: true)).toList();
+          _isLoading = false;
+        });
       }
-    });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _removeUser(String userId) {
-    final name = _users.firstWhere((u) => u.id == userId).name;
+  SharedUser _parseSharedUser(Map<String, dynamic> raw) {
+    final user = raw['sharedWith'] as Map<String, dynamic>;
+    final assetPerms = raw['assetPermissions'] as Map<String, dynamic>? ?? {};
+    return SharedUser(
+      id: raw['id'] as String,
+      name: user['name'] as String? ?? '',
+      email: user['email'] as String? ?? '',
+      avatar: user['avatar'] as String? ?? '',
+      cashflowPermission: PermissionLevel.fromString(raw['cashflowPermission'] as String? ?? 'none'),
+      assetPermissions: assetPerms.map((k, v) => MapEntry(k, PermissionLevel.fromString(v as String))),
+    );
+  }
+
+  Invitation _parseInvitation(Map<String, dynamic> raw, {required bool isIncoming}) {
+    final fromUser = raw['fromUser'] as Map<String, dynamic>?;
+    final assetPerms = raw['assetPermissions'] as Map<String, dynamic>? ?? {};
+    return Invitation(
+      id: raw['id'] as String,
+      email: raw['toEmail'] as String? ?? '',
+      name: fromUser?['name'] as String?,
+      avatar: fromUser?['avatar'] as String?,
+      status: InvitationStatus.fromString(raw['status'] as String? ?? 'pending'),
+      cashflowPermission: PermissionLevel.fromString(raw['cashflowPermission'] as String? ?? 'none'),
+      assetPermissions: assetPerms.map((k, v) => MapEntry(k, PermissionLevel.fromString(v as String))),
+      message: raw['message'] as String?,
+      sentDate: (raw['sentAt'] as String? ?? '').length >= 10
+          ? (raw['sentAt'] as String).substring(0, 10)
+          : '',
+      expiryDate: (raw['expiresAt'] as String? ?? '').length >= 10
+          ? (raw['expiresAt'] as String).substring(0, 10)
+          : null,
+      isIncoming: isIncoming,
+      inviterName: fromUser?['name'] as String?,
+    );
+  }
+
+  // ─── Permission helpers ────────────────────────────────────────────────
+
+  void _cyclePermission(SharedUser user, String type, [String? subCategoryId]) async {
+    final newCashflow = type == 'cashflow' ? user.cashflowPermission.next() : null;
+    Map<String, String>? newAssetPerms;
+
+    if (type == 'asset' && subCategoryId != null) {
+      final current = user.assetPermissions[subCategoryId] ?? PermissionLevel.none;
+      user.assetPermissions[subCategoryId] = current.next();
+      newAssetPerms = user.assetPermissions.map((k, v) => MapEntry(k, v.value));
+    }
+
     setState(() {
-      _users.removeWhere((u) => u.id == userId);
+      if (newCashflow != null) user.cashflowPermission = newCashflow;
     });
-    showSuccessSnackBar(context, "'$name' 사용자가 제거되었습니다");
+
+    try {
+      await ref.read(sharedAccessServiceProvider).updatePermissions(
+        user.id,
+        cashflowPermission: newCashflow?.value,
+        assetPermissions: newAssetPerms,
+      );
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '권한 변경 실패: $e');
+      _loadData();
+    }
+  }
+
+  Future<void> _removeUser(String userId) async {
+    final name = _users.firstWhere((u) => u.id == userId).name;
+    try {
+      await ref.read(sharedAccessServiceProvider).removeShare(userId);
+      await _loadData();
+      if (mounted) showSuccessSnackBar(context, "'$name' 사용자가 제거되었습니다");
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '제거 실패: $e');
+    }
   }
 
   // ─── Invitation actions ────────────────────────────────────────────────
 
-  void _cancelInvitation(String id) {
-    setState(() {
-      _sentInvitations.removeWhere((inv) => inv.id == id);
-    });
-    showInfoSnackBar(context, '초대가 취소되었습니다');
+  Future<void> _cancelInvitation(String id) async {
+    try {
+      await ref.read(sharedAccessServiceProvider).cancelInvitation(id);
+      await _loadData();
+      if (mounted) showInfoSnackBar(context, '초대가 취소되었습니다');
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '취소 실패: $e');
+    }
   }
 
-  void _resendInvitation(Invitation inv) {
-    setState(() {
-      inv.status = InvitationStatus.pending;
-    });
-    showSuccessSnackBar(context, '초대가 재발송되었습니다');
+  Future<void> _resendInvitation(Invitation inv) async {
+    try {
+      final service = ref.read(sharedAccessServiceProvider);
+      // 기존 초대 삭제 후 새로 생성
+      await service.cancelInvitation(inv.id);
+      await service.createInvitation(
+        toEmail: inv.email,
+        cashflowPermission: inv.cashflowPermission.value,
+        assetPermissions: inv.assetPermissions.map((k, v) => MapEntry(k, v.value)),
+        message: inv.message,
+      );
+      await _loadData();
+      if (mounted) showSuccessSnackBar(context, '초대가 재발송되었습니다');
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '재발송 실패: $e');
+    }
   }
 
-  void _acceptInvitation(Invitation inv) {
-    setState(() {
-      inv.status = InvitationStatus.accepted;
-      _users.add(SharedUser(
-        id: 'accepted-${inv.id}',
-        name: inv.inviterName ?? inv.email.split('@').first,
-        email: inv.email,
-        avatar: inv.avatar ?? '👤',
-        cashflowPermission: inv.cashflowPermission,
-        assetPermissions: Map.from(inv.assetPermissions),
-      ));
-    });
-    showSuccessSnackBar(context, '초대를 수락했습니다');
+  Future<void> _acceptInvitation(Invitation inv) async {
+    try {
+      await ref.read(sharedAccessServiceProvider).acceptInvitation(inv.id);
+      await _loadData();
+      if (mounted) showSuccessSnackBar(context, '초대를 수락했습니다');
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '수락 실패: $e');
+    }
   }
 
-  void _declineInvitation(Invitation inv) {
-    setState(() {
-      inv.status = InvitationStatus.declined;
-    });
-    showInfoSnackBar(context, '초대를 거절했습니다');
+  Future<void> _declineInvitation(Invitation inv) async {
+    try {
+      await ref.read(sharedAccessServiceProvider).declineInvitation(inv.id);
+      await _loadData();
+      if (mounted) showInfoSnackBar(context, '초대를 거절했습니다');
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, '거절 실패: $e');
+    }
   }
 
   // ─── Invite sheet ──────────────────────────────────────────────────────
@@ -195,35 +287,31 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
                     child: AlButton(
                       label: '초대하기',
                       icon: Icon(LucideIcons.send, size: 16, color: Colors.white),
-                      onPressed: () {
-                        if (emailController.text.trim().isNotEmpty) {
-                          final now = DateTime.now();
-                          final expiry = now.add(Duration(days: 7));
-                          setState(() {
-                            _sentInvitations.insert(
-                              0,
-                              Invitation(
-                                id: now.millisecondsSinceEpoch.toString(),
-                                email: emailController.text.trim(),
-                                name: null,
-                                status: InvitationStatus.pending,
-                                cashflowPermission: inviteCashflowPerm,
-                                assetPermissions: Map.from(inviteAssetPerms),
-                                message: messageController.text.trim().isEmpty
-                                    ? null
-                                    : messageController.text.trim(),
-                                sentDate:
-                                    '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-                                expiryDate:
-                                    '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}',
-                                isIncoming: false,
-                              ),
-                            );
-                          });
-                          Navigator.of(context).pop();
-                          showSuccessSnackBar(context, '초대가 발송되었습니다');
-                          // 보낸 초대 탭으로 이동
-                          _tabController.animateTo(1);
+                      onPressed: () async {
+                        final email = emailController.text.trim();
+                        if (email.isEmpty) {
+                          showErrorSnackBar(context, '이메일을 입력해 주세요');
+                          return;
+                        }
+
+                        Navigator.of(context).pop();
+
+                        try {
+                          await ref.read(sharedAccessServiceProvider).createInvitation(
+                            toEmail: email,
+                            cashflowPermission: inviteCashflowPerm.value,
+                            assetPermissions: inviteAssetPerms.map((k, v) => MapEntry(k, v.value)),
+                            message: messageController.text.trim().isEmpty
+                                ? null
+                                : messageController.text.trim(),
+                          );
+                          await _loadData();
+                          if (mounted) {
+                            showSuccessSnackBar(context, '초대가 발송되었습니다');
+                            _tabController.animateTo(1);
+                          }
+                        } catch (e) {
+                          if (mounted) showErrorSnackBar(context, '$e');
                         }
                       },
                     ),
@@ -258,6 +346,9 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
             title: '공유 및 권한 관리',
             showBack: true,
           ),
+          if (_isLoading)
+            Expanded(child: Center(child: CircularProgressIndicator()))
+          else
           Expanded(
             child: Column(
           children: [
@@ -748,8 +839,14 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
   }
 
   Widget _buildInviterAvatar(Invitation inv) {
+    final name = inv.inviterName ?? inv.email.split('@').first;
+    final initial = name.isNotEmpty ? name.characters.first : '?';
+    final avatarUrl = inv.avatar;
+    final isUrl = avatarUrl != null && avatarUrl.startsWith('http');
+
     return AlAvatar.medium(
-      text: inv.avatar ?? '👤',
+      text: initial,
+      imageUrl: isUrl ? avatarUrl : null,
       gradientColors: [AppColors.emerald400, AppColors.teal500],
     );
   }
@@ -859,7 +956,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen>
         );
       case InvitationStatus.declined:
         return _InvitationStatusConfig(
-          label: '거절됨',
+          label: '거절',
           icon: LucideIcons.xCircle,
           bgColor: AppColors.red50,
           borderColor: AppColors.red100,

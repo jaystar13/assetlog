@@ -568,8 +568,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           );
         }
 
-        final allAssets = (snapshot.data![0] as List).map((e) => (e as List).cast<Map<String, dynamic>>()).toList();
-        final allTxs = (snapshot.data![1] as List).cast<List<Transaction>>();
+        final allAssets = snapshot.data![0].map((e) => (e as List).cast<Map<String, dynamic>>()).toList();
+        final allTxs = snapshot.data![1].cast<List<Transaction>>();
 
         return AlCard(
           child: Column(

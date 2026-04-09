@@ -46,7 +46,7 @@ enum PermissionLevel {
 enum InvitationStatus {
   pending('pending', '대기중'),
   accepted('accepted', '수락됨'),
-  declined('declined', '거절됨'),
+  declined('declined', '거절'),
   expired('expired', '만료됨');
 
   const InvitationStatus(this.value, this.label);

@@ -22,6 +22,30 @@ class FinancialGoal {
       );
 }
 
+class SharedAssetSummary {
+  final String accessId;
+  final String ownerName;
+  final String? ownerAvatar;
+  final String ownerEmail;
+  final String cashflowPermission;
+  final Map<String, String> assetPermissions;
+  final num totalAssets;
+  final num totalDebts;
+  final num netWorth;
+
+  const SharedAssetSummary({
+    required this.accessId,
+    required this.ownerName,
+    this.ownerAvatar,
+    required this.ownerEmail,
+    required this.cashflowPermission,
+    required this.assetPermissions,
+    required this.totalAssets,
+    required this.totalDebts,
+    required this.netWorth,
+  });
+}
+
 class HomeDashboard {
   final num totalAssets;
   final num totalDebts;
@@ -30,6 +54,7 @@ class HomeDashboard {
   final int monthlyIncome;
   final int monthlyExpense;
   final FinancialGoal? goal;
+  final List<SharedAssetSummary> sharedAssets;
 
   const HomeDashboard({
     required this.totalAssets,
@@ -39,6 +64,7 @@ class HomeDashboard {
     required this.monthlyIncome,
     required this.monthlyExpense,
     this.goal,
+    this.sharedAssets = const [],
   });
 
   num get netWorthGrowth =>
@@ -56,6 +82,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final assetService = ref.watch(assetServiceProvider);
     final txService = ref.watch(transactionServiceProvider);
     final authService = ref.watch(authServiceProvider);
+    final sharedService = ref.watch(sharedAccessServiceProvider);
 
     final now = DateTime.now();
     final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
@@ -64,18 +91,20 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final lastMonthDate = DateTime(now.year, now.month - 1);
     final lastMonth = '${lastMonthDate.year}-${lastMonthDate.month.toString().padLeft(2, '0')}';
 
-    // 병렬 호출: 당월 자산, 전월 자산, 당월 거래, 목표
+    // 병렬 호출: 당월 자산, 전월 자산, 당월 거래, 목표, 공유받은 목록
     final results = await Future.wait([
       assetService.getAssets(month: currentMonth),
       assetService.getAssets(month: lastMonth),
       txService.getTransactions(month: currentMonth),
       authService.getGoal(),
+      sharedService.getSharedWithMe(),
     ]);
 
     final currentAssets = results[0] as List<Map<String, dynamic>>;
     final lastMonthAssets = results[1] as List<Map<String, dynamic>>;
     final transactions = results[2] as List<Transaction>;
     final goalData = results[3] as Map<String, dynamic>?;
+    final sharedWithMe = results[4] as List<Map<String, dynamic>>;
 
     // 당월 자산 합계
     final currentTotals = _calcAssetTotals(currentAssets);
@@ -95,6 +124,34 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
       }
     }
 
+    // 공유받은 자산 요약
+    final sharedSummaries = <SharedAssetSummary>[];
+    for (final access in sharedWithMe) {
+      final owner = access['owner'] as Map<String, dynamic>? ?? {};
+      final accessId = access['id'] as String;
+      final cashPerm = access['cashflowPermission'] as String? ?? 'none';
+      final assetPermsRaw = access['assetPermissions'] as Map<String, dynamic>? ?? {};
+      final assetPerms = assetPermsRaw.map((k, v) => MapEntry(k, v as String));
+
+      try {
+        final sharedAssets = await sharedService.getSharedAssets(accessId, month: currentMonth);
+        final totals = _calcAssetTotals(sharedAssets);
+        sharedSummaries.add(SharedAssetSummary(
+          accessId: accessId,
+          ownerName: owner['name'] as String? ?? '',
+          ownerAvatar: owner['avatar'] as String?,
+          ownerEmail: owner['email'] as String? ?? '',
+          cashflowPermission: cashPerm,
+          assetPermissions: assetPerms,
+          totalAssets: totals.assets,
+          totalDebts: totals.debts,
+          netWorth: totals.assets - totals.debts,
+        ));
+      } catch (_) {
+        // 공유 자산 조회 실패 시 건너뜀
+      }
+    }
+
     return HomeDashboard(
       totalAssets: currentTotals.assets,
       totalDebts: currentTotals.debts,
@@ -103,6 +160,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
       monthlyIncome: income,
       monthlyExpense: expense,
       goal: goalData != null ? FinancialGoal.fromJson(goalData) : null,
+      sharedAssets: sharedSummaries,
     );
   }
 
