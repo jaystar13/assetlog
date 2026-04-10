@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/asset_service.dart';
 import '../services/deep_link_service.dart';
-import '../services/shared_access_service.dart';
+import '../services/share_group_service.dart';
 import '../services/transaction_service.dart';
 import 'auth/auth_notifier.dart';
 import 'auth/auth_state.dart';
@@ -36,8 +36,8 @@ final assetServiceProvider = Provider<AssetService>(
   (ref) => AssetService(ref.watch(dioProvider)),
 );
 
-final sharedAccessServiceProvider = Provider<SharedAccessService>(
-  (ref) => SharedAccessService(ref.watch(dioProvider)),
+final shareGroupServiceProvider = Provider<ShareGroupService>(
+  (ref) => ShareGroupService(ref.watch(dioProvider)),
 );
 
 final deepLinkServiceProvider = Provider<DeepLinkService>(

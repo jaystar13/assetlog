@@ -122,6 +122,21 @@ enum PeriodFilter {
       values.firstWhere((e) => e.value == s, orElse: () => sixMonths);
 }
 
+// ─── Group Role ─────────────────────────────────────────────────────────────
+
+enum GroupRole {
+  admin('admin', '관리자'),
+  editor('editor', '편집자'),
+  viewer('viewer', '뷰어');
+
+  const GroupRole(this.value, this.label);
+  final String value;
+  final String label;
+
+  static GroupRole fromString(String s) =>
+      values.firstWhere((e) => e.value == s, orElse: () => viewer);
+}
+
 // ─── Income / Expense Category ───────────────────────────────────────────────
 
 enum IncomeCategory {

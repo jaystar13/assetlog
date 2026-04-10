@@ -6,7 +6,6 @@ import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
-import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
@@ -794,7 +793,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // === Shared Assets Section ===
   Widget _buildSharedAssetsSection() {
-    final sharedAssets = _dashboard!.sharedAssets;
+    final sharedGroups = _dashboard!.sharedGroups;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -802,10 +801,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         AlSectionHeader(
           title: '공유받은 자산',
           actionLabel: '전체 보기',
-          onAction: () => context.go('/more/access'),
+          onAction: () => context.go('/more/groups'),
         ),
         SizedBox(height: AppSpacing.md),
-        if (sharedAssets.isEmpty)
+        if (sharedGroups.isEmpty)
           AlCard(
             child: Center(
               child: Padding(
@@ -815,7 +814,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Icon(LucideIcons.users, size: 36, color: AppColors.gray300),
                     SizedBox(height: AppSpacing.md),
                     Text(
-                      '공유받은 자산이 없습니다',
+                      '공유 그룹이 없습니다',
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.gray500,
                       ),
@@ -826,157 +825,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           )
         else
-          ...sharedAssets.map(_buildSharedAssetCard),
+          ...sharedGroups.map(_buildGroupCard),
       ],
     );
   }
 
-  Widget _buildSharedAssetCard(SharedAssetSummary shared) {
-    final totalAssets = shared.totalAssets;
-    final totalDebt = shared.totalDebts;
-    final netWorth = shared.netWorth;
-
+  Widget _buildGroupCard(SharedGroupSummary group) {
     return GestureDetector(
-      onTap: () => context.push('/shared-asset/${shared.accessId}', extra: {
-        'ownerName': shared.ownerName,
-        'ownerAvatar': shared.ownerAvatar,
-        'cashflowPermission': shared.cashflowPermission,
-        'assetPermissions': shared.assetPermissions,
-      }),
-      child: AlCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 헤더: 아바타 + 이름 + 이메일
-          Row(
+      onTap: () => context.push('/more/groups/${group.groupId}'),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: AppSpacing.md),
+        child: AlCard(
+          child: Row(
             children: [
-              AlAvatar.medium(
-                text: shared.ownerName.isNotEmpty ? shared.ownerName.characters.first : '?',
-                imageUrl: shared.ownerAvatar,
-                gradientColors: [AppColors.emerald400, AppColors.teal500],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.emerald50,
+                  borderRadius: AppRadius.mdAll,
+                ),
+                child: Icon(LucideIcons.users, size: 22, color: AppColors.emerald600),
               ),
               SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${shared.ownerName}님의 자산',
-                      style: AppTypography.label,
-                    ),
+                    Text(group.groupName, style: AppTypography.label),
                     SizedBox(height: 2),
                     Text(
-                      shared.ownerEmail,
-                      style: AppTypography.caption,
+                      '멤버 ${group.memberCount}명 · 공유 ${group.sharedItemCount}건',
+                      style: AppTypography.caption.copyWith(color: AppColors.gray500),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: AppColors.gray400,
-              ),
+              Icon(LucideIcons.chevronRight, size: 18, color: AppColors.gray400),
             ],
           ),
-          SizedBox(height: AppSpacing.lg),
-
-          // 자산 요약: 3열
-          Container(
-            padding: EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.gray50,
-              borderRadius: AppRadius.mdAll,
-            ),
-            child: Row(
-              children: [
-                _buildSharedStat('총 자산', totalAssets, AppColors.emerald600),
-                _buildSharedStatDivider(),
-                _buildSharedStat('부채', totalDebt, AppColors.red600),
-                _buildSharedStatDivider(),
-                _buildSharedStat('순자산', netWorth, AppColors.blue600),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.md),
-
-          // 권한 요약
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.emerald50,
-              borderRadius: AppRadius.smAll,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  LucideIcons.shieldCheck,
-                  size: 14,
-                  color: AppColors.emerald600,
-                ),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _buildPermissionSummary(shared),
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.emerald700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-
-  String _buildPermissionSummary(SharedAssetSummary shared) {
-    final parts = <String>[];
-    if (shared.cashflowPermission != 'none') {
-      parts.add('수입/지출: ${shared.cashflowPermission == 'edit' ? '편집' : '보기'}');
-    }
-    final assetParts = shared.assetPermissions.entries
-        .where((e) => e.value != 'none')
-        .map((e) {
-          final catName = {'real-estate': '부동산', 'stocks': '주식', 'cash': '현금', 'loans': '부채'}[e.key] ?? e.key;
-          return '$catName ${e.value == 'edit' ? '편집' : '보기'}';
-        });
-    if (assetParts.isNotEmpty) parts.add('자산: ${assetParts.join(', ')}');
-    return parts.isEmpty ? '권한 없음' : parts.join(' · ');
-  }
-
-  Widget _buildSharedStat(String label, num value, Color color) {
-    String formatted;
-    if (value >= 100000000) {
-      final billions = value / 100000000;
-      formatted = '${billions.toStringAsFixed(1)}억';
-    } else {
-      formatted = formatKoreanWon(value);
-    }
-
-    return Expanded(
-      child: Column(
-        children: [
-          Text(label, style: AppTypography.caption),
-          SizedBox(height: 4),
-          Text(
-            formatted,
-            style: AppTypography.labelSmall.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSharedStatDivider() {
-    return Container(width: 1, height: 32, color: AppColors.gray200);
-  }
 }

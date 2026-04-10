@@ -45,7 +45,7 @@ class MoreScreen extends ConsumerWidget {
                 _MenuItem(
                   icon: LucideIcons.users,
                   label: '공유/권한 관리',
-                  onTap: () => context.go('/more/access'),
+                  onTap: () => context.go('/more/groups'),
                 ),
                 _MenuItem(
                   icon: LucideIcons.bell,
