@@ -8,8 +8,7 @@ import { AssetsModule } from './assets/assets.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CardCompaniesModule } from './card-companies/card-companies.module';
 import { ImportModule } from './import/import.module';
-import { InvitationsModule } from './invitations/invitations.module';
-import { SharedAccessModule } from './shared-access/shared-access.module';
+import { ShareGroupsModule } from './share-groups/share-groups.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -22,8 +21,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     TransactionsModule,
     CardCompaniesModule,
     ImportModule,
-    InvitationsModule,
-    SharedAccessModule,
+    ShareGroupsModule,
   ],
   providers: [
     {

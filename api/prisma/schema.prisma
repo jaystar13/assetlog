@@ -22,9 +22,10 @@ model User {
   transactions        Transaction[]
   financialGoal       FinancialGoal?
   refreshTokens       RefreshToken[]
-  sharedAccessOwned   SharedAccess[]  @relation("Owner")
-  sharedAccessGranted SharedAccess[]  @relation("SharedWith")
-  invitationsSent     Invitation[]    @relation("InvitationFrom")
+  createdGroups       ShareGroup[]         @relation("GroupCreator")
+  groupMemberships    ShareGroupMember[]
+  sharedItems         SharedItem[]         @relation("SharedItemOwner")
+  groupInvitationsSent GroupInvitation[]   @relation("GroupInviter")
 
   @@unique([provider, providerId])
   @@map("users")
@@ -94,23 +95,23 @@ model AssetValueHistory {
 // ─── Transaction ─────────────────────────────────────────────────────────────
 
 model Transaction {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type           String   // "income" | "expense"
-  name           String
-  amount         Int
-  date           DateTime
-  category       String
-  subCategory    String   @map("sub_category")
-  paymentMethod  String?  @map("payment_method") // 결제수단 (카드사명 또는 계좌이체/현금 등)
-  targetMonth       String?  @map("target_month")       // 귀속월 "YYYY-MM" (카드 명세서 임포트 시 사용자가 지정)
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String   // "income" | "expense"
+  name              String
+  amount            Int
+  date              DateTime
+  category          String
+  subCategory       String   @map("sub_category")
+  paymentMethod     String?  @map("payment_method")
+  targetMonth       String?  @map("target_month")
   isInstallment     Boolean  @default(false) @map("is_installment")
-  installmentMonths Int?     @map("installment_months") // 할부 기간 (개월)
-  installmentRound  Int?     @map("installment_round")  // 현재 회차
+  installmentMonths Int?     @map("installment_months")
+  installmentRound  Int?     @map("installment_round")
   editedByUserId    String?  @map("edited_by_user_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@index([userId, date])
   @@index([userId, type])
@@ -118,41 +119,76 @@ model Transaction {
   @@map("transactions")
 }
 
-// ─── SharedAccess ────────────────────────────────────────────────────────────
+// ─── ShareGroup (공유 그룹) ──────────────────────────────────────────────────
 
-model SharedAccess {
-  id                 String   @id @default(uuid())
-  ownerUserId        String   @map("owner_user_id")
-  owner              User     @relation("Owner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  sharedWithUserId   String   @map("shared_with_user_id")
-  sharedWith         User     @relation("SharedWith", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
-  cashflowPermission String   @default("none") @map("cashflow_permission")
-  assetPermissions   Json     @default("{}") @map("asset_permissions")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+model ShareGroup {
+  id          String   @id @default(uuid())
+  name        String
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([ownerUserId, sharedWithUserId])
-  @@index([sharedWithUserId])
-  @@map("shared_access")
+  members     ShareGroupMember[]
+  sharedItems SharedItem[]
+  invitations GroupInvitation[]
+
+  @@index([createdById])
+  @@map("share_groups")
 }
 
-// ─── Invitation ──────────────────────────────────────────────────────────────
+model ShareGroupMember {
+  id       String   @id @default(uuid())
+  groupId  String   @map("group_id")
+  group    ShareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     String   @default("viewer") // "admin" | "editor" | "viewer"
+  joinedAt DateTime @default(now()) @map("joined_at")
 
-model Invitation {
-  id                 String   @id @default(uuid())
-  fromUserId         String   @map("from_user_id")
-  fromUser           User     @relation("InvitationFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toEmail            String   @map("to_email")
-  status             String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
-  cashflowPermission String   @default("none") @map("cashflow_permission")
-  assetPermissions   Json     @default("{}") @map("asset_permissions")
-  message            String?
-  sentAt             DateTime @default(now()) @map("sent_at")
-  expiresAt          DateTime @map("expires_at")
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("share_group_members")
+}
+
+// ─── SharedItem (개별 항목 공유) ─────────────────────────────────────────────
+
+model SharedItem {
+  id          String   @id @default(uuid())
+  groupId     String   @map("group_id")
+  group       ShareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  ownerUserId String   @map("owner_user_id")
+  owner       User     @relation("SharedItemOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  itemType    String   @map("item_type") // "transaction" | "asset"
+  itemId      String   @map("item_id")
+  permission  String   @default("view") // "view" | "edit"
+  sharedAt    DateTime @default(now()) @map("shared_at")
+
+  @@unique([groupId, itemType, itemId])
+  @@index([groupId, itemType])
+  @@index([ownerUserId])
+  @@index([itemId])
+  @@map("shared_items")
+}
+
+// ─── GroupInvitation (그룹 초대) ─────────────────────────────────────────────
+
+model GroupInvitation {
+  id          String   @id @default(uuid())
+  groupId     String   @map("group_id")
+  group       ShareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedById String   @map("invited_by_id")
+  invitedBy   User     @relation("GroupInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+  toEmail     String   @map("to_email")
+  role        String   @default("viewer") // 수락 시 부여할 역할
+  status      String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
+  message     String?
+  sentAt      DateTime @default(now()) @map("sent_at")
+  expiresAt   DateTime @map("expires_at")
 
   @@index([toEmail])
-  @@index([fromUserId])
-  @@map("invitations")
+  @@index([groupId])
+  @@map("group_invitations")
 }
 
 // ─── Seed Tables ─────────────────────────────────────────────────────────────
