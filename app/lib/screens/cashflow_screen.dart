@@ -126,13 +126,23 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     });
   }
 
-  void _showManualEntrySheet() {
+  void _showManualEntrySheet() async {
+    // 그룹 목록 가져오기
+    List<Map<String, dynamic>> groups = [];
+    try {
+      groups = await ref.read(shareGroupServiceProvider).getMyGroups();
+    } catch (_) {}
+
+    if (!mounted) return;
+
     AlBottomSheet.show(
       context: context,
       title: '수기 입력',
       child: _ManualEntryForm(
+        shareGroups: groups,
         onSubmit: (entry) async {
           Navigator.of(context).pop();
+          final shareGroupIds = (entry['shareGroupIds'] as List<String>?) ?? [];
           await ref.read(transactionNotifierProvider(_monthKey).notifier).addTransaction(
             type: entry['type'] as String,
             name: entry['name'] as String,
@@ -140,6 +150,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             date: entry['date'] as String,
             category: entry['category'] as String,
             subCategory: entry['subCategory'] as String,
+            shareGroupIds: shareGroupIds.isNotEmpty ? shareGroupIds : null,
           );
           if (mounted) showSuccessSnackBar(context, '거래가 추가되었습니다');
         },
@@ -1040,8 +1051,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 class _ManualEntryForm extends StatefulWidget {
   final void Function(Map<String, dynamic>) onSubmit;
   final Map<String, dynamic>? initialData;
+  final List<Map<String, dynamic>> shareGroups;
 
-  const _ManualEntryForm({required this.onSubmit, this.initialData});
+  const _ManualEntryForm({required this.onSubmit, this.initialData, this.shareGroups = const []});
 
   bool get isEditMode => initialData != null;
 
@@ -1069,6 +1081,9 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   // 지출 > 계좌이체: 출금 계좌
   String _selectedTransferAccount = '주거래계좌';
   static const _transferAccounts = ['주거래계좌', '급여계좌', '저축계좌', '비상금계좌'];
+
+  // 공유 그룹 선택
+  final Set<String> _selectedGroupIds = {};
 
   // 지출 > 신용카드 > 할부
   bool _isInstallment = false;
@@ -1185,6 +1200,10 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           entry['transferAccount'] = _selectedTransferAccount;
         }
       }
+    }
+
+    if (_selectedGroupIds.isNotEmpty) {
+      entry['shareGroupIds'] = _selectedGroupIds.toList();
     }
 
     widget.onSubmit(entry);
@@ -1591,6 +1610,49 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
             if (val != null) setState(() => _selectedSubCategory = val);
           },
         ),
+        // 공유 그룹 선택
+        if (widget.shareGroups.isNotEmpty && !widget.isEditMode) ...[
+          SizedBox(height: AppSpacing.xl),
+          Text('공유 그룹', style: AppTypography.label),
+          SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: widget.shareGroups.map((g) {
+              final groupId = g['id'] as String;
+              final groupName = g['name'] as String;
+              final isSelected = _selectedGroupIds.contains(groupId);
+              return GestureDetector(
+                onTap: () => setState(() {
+                  if (isSelected) { _selectedGroupIds.remove(groupId); }
+                  else { _selectedGroupIds.add(groupId); }
+                }),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.emerald50 : AppColors.gray50,
+                    borderRadius: AppRadius.fullAll,
+                    border: Border.all(color: isSelected ? AppColors.emerald500 : AppColors.gray200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                        size: 14,
+                        color: isSelected ? AppColors.emerald600 : AppColors.gray400,
+                      ),
+                      SizedBox(width: 6),
+                      Text(groupName, style: AppTypography.bodySmall.copyWith(
+                        color: isSelected ? AppColors.emerald700 : AppColors.gray600,
+                      )),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
         SizedBox(height: AppSpacing.xl),
 
         // Submit

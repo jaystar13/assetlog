@@ -38,6 +38,7 @@ class TransactionService {
     required String subCategory,
     String? paymentMethod,
     String? targetMonth,
+    List<String>? shareGroupIds,
   }) async {
     try {
       final response = await _dio.post(
@@ -51,6 +52,7 @@ class TransactionService {
           'subCategory': subCategory,
           if (paymentMethod != null) 'paymentMethod': paymentMethod,
           if (targetMonth != null) 'targetMonth': targetMonth,
+          if (shareGroupIds != null) 'shareGroupIds': shareGroupIds,
         },
       );
       return Transaction.fromMap(_unwrap(response));

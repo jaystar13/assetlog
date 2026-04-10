@@ -54,9 +54,10 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
     required String categoryId,
     required String name,
     int? initialValue,
+    List<String>? shareGroupIds,
   }) async {
     final service = ref.read(assetServiceProvider);
-    final created = await service.createAsset(categoryId: categoryId, name: name);
+    final created = await service.createAsset(categoryId: categoryId, name: name, shareGroupIds: shareGroupIds);
     final assetId = created['id'] as String;
     developer.log('Asset created: $assetId, initialValue: $initialValue', name: 'AssetNotifier');
 

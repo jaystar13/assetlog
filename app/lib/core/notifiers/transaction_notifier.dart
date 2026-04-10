@@ -23,6 +23,7 @@ class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transactio
     required String subCategory,
     String? paymentMethod,
     String? targetMonth,
+    List<String>? shareGroupIds,
   }) async {
     await _service.createTransaction(
       type: type,
@@ -33,6 +34,7 @@ class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transactio
       subCategory: subCategory,
       paymentMethod: paymentMethod,
       targetMonth: targetMonth,
+      shareGroupIds: shareGroupIds,
     );
     _invalidateAll();
   }

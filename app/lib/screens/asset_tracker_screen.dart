@@ -16,6 +16,7 @@ import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/asset_notifier.dart';
+import '../core/providers.dart';
 import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
@@ -67,11 +68,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   }
 
   // ─── 새 자산 추가 Bottom Sheet ──────────────────────────────────────
-  void _showAddAssetSheet() {
+  void _showAddAssetSheet() async {
     final nameController = TextEditingController();
     final valueController = TextEditingController();
     final groups = ref.read(assetNotifierProvider(_monthKey)).valueOrNull ?? [];
     String selectedGroup = groups.isNotEmpty ? groups.first.id : 'cash';
+
+    // 공유 그룹 목록 가져오기
+    List<Map<String, dynamic>> shareGroups = [];
+    try { shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups(); } catch (_) {}
+    final selectedShareGroupIds = <String>{};
+    if (!mounted) return;
 
     AlBottomSheet.show(
       context: context,
@@ -134,6 +141,43 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 inputFormatters: [CurrencyInputFormatter()],
                 prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
               ),
+              // 공유 그룹 선택
+              if (shareGroups.isNotEmpty) ...[
+                SizedBox(height: AppSpacing.xl),
+                Text('공유 그룹', style: AppTypography.label),
+                SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: shareGroups.map((g) {
+                    final gId = g['id'] as String;
+                    final gName = g['name'] as String;
+                    final sel = selectedShareGroupIds.contains(gId);
+                    return GestureDetector(
+                      onTap: () => setSheetState(() {
+                        if (sel) { selectedShareGroupIds.remove(gId); }
+                        else { selectedShareGroupIds.add(gId); }
+                      }),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: sel ? AppColors.emerald50 : AppColors.gray50,
+                          borderRadius: AppRadius.fullAll,
+                          border: Border.all(color: sel ? AppColors.emerald500 : AppColors.gray200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(sel ? LucideIcons.checkCircle2 : LucideIcons.circle, size: 14, color: sel ? AppColors.emerald600 : AppColors.gray400),
+                            SizedBox(width: 6),
+                            Text(gName, style: AppTypography.bodySmall.copyWith(color: sel ? AppColors.emerald700 : AppColors.gray600)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
               SizedBox(height: AppSpacing.xl),
 
               // 추가 버튼
@@ -169,6 +213,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     categoryId: selectedGroup,
                     name: name,
                     initialValue: actualValue,
+                    shareGroupIds: selectedShareGroupIds.isNotEmpty ? selectedShareGroupIds.toList() : null,
                   );
 
                   _expandedGroups.add(selectedGroup);

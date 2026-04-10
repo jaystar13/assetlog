@@ -27,11 +27,16 @@ class AssetService {
   Future<Map<String, dynamic>> createAsset({
     required String categoryId,
     required String name,
+    List<String>? shareGroupIds,
   }) async {
     try {
       final response = await _dio.post(
         '/assets',
-        data: {'categoryId': categoryId, 'name': name},
+        data: {
+          'categoryId': categoryId,
+          'name': name,
+          if (shareGroupIds != null) 'shareGroupIds': shareGroupIds,
+        },
       );
       return _unwrap(response);
     } on DioException catch (e) {
