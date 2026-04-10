@@ -126,7 +126,6 @@ enum PeriodFilter {
 
 enum GroupRole {
   admin('admin', '관리자'),
-  editor('editor', '편집자'),
   viewer('viewer', '뷰어');
 
   const GroupRole(this.value, this.label);

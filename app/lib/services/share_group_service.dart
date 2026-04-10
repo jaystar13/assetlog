@@ -49,13 +49,11 @@ class ShareGroupService {
   Future<Map<String, dynamic>> inviteToGroup(
     String groupId, {
     required String toEmail,
-    String? role,
     String? message,
   }) async {
     try {
       final response = await _dio.post('/share-groups/$groupId/invite', data: {
         'toEmail': toEmail,
-        if (role != null) 'role': role,
         if (message != null) 'message': message,
       });
       return _unwrap(response);
