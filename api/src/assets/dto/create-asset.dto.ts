@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export const ASSET_CATEGORIES = ['real-estate', 'stocks', 'cash', 'loans'] as const;
 export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
@@ -13,4 +13,10 @@ export class CreateAssetDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiPropertyOptional({ example: ['group-uuid-1'], description: '공유할 그룹 ID 목록' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  shareGroupIds?: string[];
 }

@@ -29,14 +29,30 @@ export class AssetsService {
 
   // ─────────────────────── 생성 ───────────────────────
 
-  create(userId: string, dto: CreateAssetDto) {
-    return this.prisma.asset.create({
+  async create(userId: string, dto: CreateAssetDto) {
+    const asset = await this.prisma.asset.create({
       data: {
         userId,
         categoryId: dto.categoryId,
         name: dto.name,
       },
     });
+
+    // 그룹에 자동 공유
+    if (dto.shareGroupIds?.length) {
+      await this.prisma.sharedItem.createMany({
+        data: dto.shareGroupIds.map((groupId) => ({
+          groupId,
+          ownerUserId: userId,
+          itemType: 'asset',
+          itemId: asset.id,
+          permission: 'view',
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return asset;
   }
 
   // ─────────────────────── 수정 ───────────────────────

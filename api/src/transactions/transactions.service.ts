@@ -54,8 +54,8 @@ export class TransactionsService {
 
   // ─────────────────────── 생성 ───────────────────────
 
-  create(userId: string, dto: CreateTransactionDto) {
-    return this.prisma.transaction.create({
+  async create(userId: string, dto: CreateTransactionDto) {
+    const transaction = await this.prisma.transaction.create({
       data: {
         userId,
         type: dto.type,
@@ -71,6 +71,22 @@ export class TransactionsService {
         installmentRound: dto.installmentRound ?? null,
       },
     });
+
+    // 그룹에 자동 공유
+    if (dto.shareGroupIds?.length) {
+      await this.prisma.sharedItem.createMany({
+        data: dto.shareGroupIds.map((groupId) => ({
+          groupId,
+          ownerUserId: userId,
+          itemType: 'transaction',
+          itemId: transaction.id,
+          permission: 'view',
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return transaction;
   }
 
   // ─────────────────────── 수정 ───────────────────────

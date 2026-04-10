@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { ALL_PAYMENT_METHODS } from '../../common/constants/payment-method.constants';
 
 export const TRANSACTION_TYPES = ['income', 'expense'] as const;
@@ -75,4 +75,10 @@ export class CreateTransactionDto {
   @IsInt()
   @Min(1)
   installmentRound?: number;
+
+  @ApiPropertyOptional({ example: ['group-uuid-1'], description: '공유할 그룹 ID 목록' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  shareGroupIds?: string[];
 }
