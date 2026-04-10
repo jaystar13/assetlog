@@ -32,6 +32,12 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   DateTime _selectedMonth = DateTime.now();
   final Set<String> _expandedGroups = {};
 
+  // 그룹 전환
+  String? _selectedGroupId;
+  String _selectedGroupName = '나';
+  List<Map<String, dynamic>> _myGroups = [];
+  bool _groupsLoaded = false;
+
   String get _monthKey =>
       '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
@@ -475,53 +481,209 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
     );
   }
 
+  bool get _isGroupMode => _selectedGroupId != null;
+
+  Future<void> _loadGroups() async {
+    if (_groupsLoaded) return;
+    _groupsLoaded = true;
+    try {
+      final groups = await ref.read(shareGroupServiceProvider).getMyGroups();
+      if (mounted) setState(() => _myGroups = groups);
+    } catch (_) {}
+  }
+
+  void _showGroupSelector() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(LucideIcons.user, color: _selectedGroupId == null ? AppColors.emerald600 : AppColors.gray500),
+              title: Text('나', style: AppTypography.bodyLarge),
+              trailing: _selectedGroupId == null ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
+              onTap: () { setState(() { _selectedGroupId = null; _selectedGroupName = '나'; }); Navigator.pop(ctx); },
+            ),
+            ..._myGroups.map((g) {
+              final gId = g['id'] as String;
+              final gName = g['name'] as String;
+              final sel = _selectedGroupId == gId;
+              return ListTile(
+                leading: Icon(LucideIcons.users, color: sel ? AppColors.emerald600 : AppColors.gray500),
+                title: Text(gName, style: AppTypography.bodyLarge),
+                trailing: sel ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
+                onTap: () { setState(() { _selectedGroupId = gId; _selectedGroupName = gName; }); Navigator.pop(ctx); },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    _loadGroups();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          AlScreenHeader(title: '자산 현황', subtitle: '나의 자산을 카테고리별로 관리하세요'),
+          AlScreenHeader(
+            title: '자산 현황',
+            subtitle: '나의 자산을 카테고리별로 관리하세요',
+            action: _myGroups.isNotEmpty ? GestureDetector(
+              onTap: _showGroupSelector,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isGroupMode ? AppColors.emerald50 : AppColors.gray50,
+                  borderRadius: AppRadius.fullAll,
+                  border: Border.all(color: _isGroupMode ? AppColors.emerald500 : AppColors.gray200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_isGroupMode ? LucideIcons.users : LucideIcons.user, size: 14,
+                        color: _isGroupMode ? AppColors.emerald600 : AppColors.gray600),
+                    SizedBox(width: 6),
+                    Text(_selectedGroupName, style: AppTypography.bodySmall.copyWith(
+                        color: _isGroupMode ? AppColors.emerald700 : AppColors.gray600)),
+                    SizedBox(width: 4),
+                    Icon(LucideIcons.chevronDown, size: 12, color: AppColors.gray400),
+                  ],
+                ),
+              ),
+            ) : null,
+          ),
 
-          // Month selector
           AlMonthSelector(
             selectedMonth: _selectedMonth,
             onPrevious: _goToPreviousMonth,
             onNext: _goToNextMonth,
           ),
 
-          // Scrollable content
           Expanded(
-            child: ref.watch(assetNotifierProvider(_monthKey)).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
-              data: (groups) => SingleChildScrollView(
-                padding: EdgeInsets.only(
-                  left: AppSpacing.screenPadding,
-                  right: AppSpacing.screenPadding,
-                  bottom: AppSpacing.bottomNavSafeArea,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: AppSpacing.lg),
-                    _buildPieChartCard(groups),
-                    SizedBox(height: AppSpacing.sectionGap),
-                    ...groups.map((group) => Padding(
-                          key: ValueKey(group.id),
-                          padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                          child: _buildAssetGroupCard(group),
-                        )),
-                    SizedBox(height: AppSpacing.sm),
-                    _buildAddAssetButton(),
-                    SizedBox(height: AppSpacing.sectionGap),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildAssetContent(),
           ),
         ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _sharedAssets = [];
+  String? _lastAssetGroupKey;
+
+  Future<void> _loadSharedAssets() async {
+    final key = '${_selectedGroupId}_$_monthKey';
+    if (_lastAssetGroupKey == key) return;
+    if (_selectedGroupId == null) {
+      _sharedAssets = [];
+      _lastAssetGroupKey = key;
+      return;
+    }
+    try {
+      final assets = await ref.read(shareGroupServiceProvider).getGroupAssets(_selectedGroupId!, month: _monthKey);
+      if (mounted) setState(() { _sharedAssets = assets; _lastAssetGroupKey = key; });
+    } catch (_) {}
+  }
+
+  Widget _buildSharedAssetItem(Map<String, dynamic> raw) {
+    final name = raw['name'] as String? ?? '';
+    final catId = raw['categoryId'] as String? ?? '';
+    final history = raw['valueHistory'] as List<dynamic>? ?? [];
+    final value = history.isNotEmpty ? (history.first['value'] as num).toInt() : 0;
+    final owner = raw['user'] as Map<String, dynamic>? ?? {};
+    final ownerName = owner['name'] as String? ?? '';
+    final catConfig = {
+      'real-estate': ('부동산', LucideIcons.home, AppColors.blue600),
+      'stocks': ('주식', LucideIcons.trendingUp, AppColors.green600),
+      'cash': ('현금', LucideIcons.banknote, AppColors.purple600),
+      'loans': ('부채', LucideIcons.creditCard, AppColors.red600),
+    };
+    final config = catConfig[catId];
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
+      child: Row(
+        children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: config?.$3 ?? AppColors.gray400, shape: BoxShape.circle)),
+          SizedBox(width: AppSpacing.md),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500)),
+              SizedBox(height: 2),
+              Row(children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: AppColors.teal500.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(LucideIcons.users, size: 10, color: AppColors.teal500),
+                    SizedBox(width: 3),
+                    Text(ownerName, style: AppTypography.caption.copyWith(color: AppColors.teal500, fontSize: 10, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ]),
+            ],
+          )),
+          Text(formatKoreanWon(value), style: AppTypography.amountSmall),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssetContent() {
+    if (_isGroupMode) _loadSharedAssets();
+    // 그룹 모드 해제 시 공유 데이터 클리어
+    if (!_isGroupMode && _sharedAssets.isNotEmpty) {
+      _sharedAssets = [];
+      _lastAssetGroupKey = null;
+    }
+    return ref.watch(assetNotifierProvider(_monthKey)).when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
+      data: (groups) => SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: AppSpacing.screenPadding,
+          right: AppSpacing.screenPadding,
+          bottom: AppSpacing.bottomNavSafeArea,
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: AppSpacing.lg),
+            _buildPieChartCard(groups),
+            SizedBox(height: AppSpacing.sectionGap),
+            ...groups.map((group) => Padding(
+                  key: ValueKey(group.id),
+                  padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                  child: _buildAssetGroupCard(group),
+                )),
+            // 공유받은 자산 (그룹 모드일 때)
+            if (_isGroupMode && _sharedAssets.isNotEmpty) ...[
+              SizedBox(height: AppSpacing.lg),
+              Row(children: [
+                Icon(LucideIcons.users, size: 16, color: AppColors.teal500),
+                SizedBox(width: AppSpacing.sm),
+                Text('공유받은 자산', style: AppTypography.heading3.copyWith(color: AppColors.teal500)),
+              ]),
+              SizedBox(height: AppSpacing.md),
+              AlCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: _sharedAssets.map(_buildSharedAssetItem).toList(),
+                ),
+              ),
+            ],
+            SizedBox(height: AppSpacing.lg),
+            _buildAddAssetButton(),
+            SizedBox(height: AppSpacing.sectionGap),
+          ],
+        ),
+      ),
     );
   }
 
