@@ -143,7 +143,7 @@ model ShareGroupMember {
   group    ShareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   userId   String   @map("user_id")
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role     String   @default("viewer") // "admin" | "editor" | "viewer"
+  role     String   @default("viewer") // "admin" | "viewer"
   joinedAt DateTime @default(now()) @map("joined_at")
 
   @@unique([groupId, userId])
@@ -161,7 +161,6 @@ model SharedItem {
   owner       User     @relation("SharedItemOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   itemType    String   @map("item_type") // "transaction" | "asset"
   itemId      String   @map("item_id")
-  permission  String   @default("view") // "view" | "edit"
   sharedAt    DateTime @default(now()) @map("shared_at")
 
   @@unique([groupId, itemType, itemId])

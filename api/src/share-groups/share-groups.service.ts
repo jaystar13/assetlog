@@ -102,7 +102,7 @@ export class ShareGroupsService {
         groupId,
         invitedById: userId,
         toEmail: dto.toEmail.toLowerCase(),
-        role: dto.role ?? 'viewer',
+        role: 'viewer',
         message: dto.message ?? null,
         expiresAt,
       },
@@ -222,7 +222,6 @@ export class ShareGroupsService {
       ownerUserId: userId,
       itemType: item.itemType,
       itemId: item.itemId,
-      permission: item.permission ?? 'view',
     }));
 
     // skipDuplicates로 이미 공유된 항목은 무시
@@ -249,7 +248,7 @@ export class ShareGroupsService {
 
     const sharedItems = await this.prisma.sharedItem.findMany({
       where: { groupId, itemType: 'transaction' },
-      select: { itemId: true, permission: true, ownerUserId: true },
+      select: { itemId: true, ownerUserId: true },
     });
 
     if (sharedItems.length === 0) return [];
@@ -273,7 +272,7 @@ export class ShareGroupsService {
 
     return transactions.map((tx) => {
       const si = sharedItems.find((s) => s.itemId === tx.id);
-      return { ...tx, _permission: si?.permission ?? 'view' };
+      return tx;
     });
   }
 
@@ -282,7 +281,7 @@ export class ShareGroupsService {
 
     const sharedItems = await this.prisma.sharedItem.findMany({
       where: { groupId, itemType: 'asset' },
-      select: { itemId: true, permission: true, ownerUserId: true },
+      select: { itemId: true, ownerUserId: true },
     });
 
     if (sharedItems.length === 0) return [];

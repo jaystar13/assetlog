@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ShareItemEntry {
@@ -10,11 +10,6 @@ class ShareItemEntry {
   @ApiProperty({ example: 'uuid-of-item', description: '거래 또는 자산 ID' })
   @IsString()
   itemId: string;
-
-  @ApiProperty({ enum: ['view', 'edit'], example: 'view', description: '항목별 권한' })
-  @IsOptional()
-  @IsIn(['view', 'edit'])
-  permission?: string;
 }
 
 export class ShareItemsDto {
