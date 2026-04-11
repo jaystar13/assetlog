@@ -11,7 +11,6 @@ import '../design_system/components/al_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
 import '../design_system/components/al_confirm_dialog.dart';
 import '../design_system/components/al_input.dart';
-import '../design_system/components/al_badge.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
@@ -45,14 +44,20 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   // 카드 사용 내역 펼침
   bool _showCardUsage = false;
 
+  // 거래 그룹 펼침 상태
+  final Set<String> _expandedTxGroups = {};
+
   // 다중 선택 모드
   bool _isSelectMode = false;
   final Set<String> _selectedIds = {};
 
-  void _toggleSelectMode() {
+  void _toggleSelectMode({List<String>? allGroupKeys}) {
     setState(() {
       _isSelectMode = !_isSelectMode;
       _selectedIds.clear();
+      if (_isSelectMode && allGroupKeys != null) {
+        _expandedTxGroups.addAll(allGroupKeys);
+      }
     });
   }
 
@@ -156,6 +161,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             date: entry['date'] as String,
             category: entry['category'] as String,
             subCategory: entry['subCategory'] as String,
+            paymentMethod: entry['paymentMethod'] as String?,
             shareGroupIds: shareGroupIds.isNotEmpty ? shareGroupIds : null,
           );
           if (mounted) showSuccessSnackBar(context, '거래가 추가되었습니다');
@@ -164,12 +170,23 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  void _showEditEntrySheet(Transaction tx) {
+  void _showEditEntrySheet(Transaction tx) async {
+    List<Map<String, dynamic>> groups = [];
+    List<String> currentGroupIds = [];
+    try {
+      final service = ref.read(shareGroupServiceProvider);
+      groups = await service.getMyGroups();
+      currentGroupIds = await service.getItemSharedGroups('transaction', tx.id);
+    } catch (_) {}
+    if (!mounted) return;
+
     AlBottomSheet.show(
       context: context,
       title: '거래 수정',
       child: _ManualEntryForm(
         initialData: tx.toMap(),
+        shareGroups: groups,
+        initialShareGroupIds: currentGroupIds,
         onSubmit: (updated) async {
           Navigator.of(context).pop();
           const allowedFields = {'type', 'name', 'amount', 'date', 'category', 'subCategory', 'paymentMethod', 'targetMonth', 'isInstallment', 'installmentMonths', 'installmentRound'};
@@ -180,6 +197,18 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             tx.id,
             payload,
           );
+
+          // 공유 그룹 변경
+          final shareGroupIds = (updated['shareGroupIds'] as List<String>?) ?? [];
+          if (shareGroupIds.isNotEmpty) {
+            try {
+              await ref.read(shareGroupServiceProvider).shareItems(
+                shareGroupIds.first,
+                [{'itemType': 'transaction', 'itemId': tx.id}],
+              );
+            } catch (_) {}
+          }
+
           if (mounted) showSuccessSnackBar(context, '거래가 수정되었습니다');
         },
       ),
@@ -219,13 +248,15 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             ..._myGroups.map((g) {
               final gId = g['id'] as String;
               final gName = g['name'] as String;
+              final memberCount = (g['members'] as List?)?.length ?? 0;
+              final displayName = '$gName(${memberCount}명)';
               final isSelected = _selectedGroupId == gId;
               return ListTile(
                 leading: Icon(LucideIcons.users, color: isSelected ? AppColors.emerald600 : AppColors.gray500),
-                title: Text(gName, style: AppTypography.bodyLarge),
+                title: Text(displayName, style: AppTypography.bodyLarge),
                 trailing: isSelected ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
                 onTap: () {
-                  setState(() { _selectedGroupId = gId; _selectedGroupName = gName; });
+                  setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; });
                   Navigator.pop(ctx);
                 },
               );
@@ -358,7 +389,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                               ],
                               if (filtered.isNotEmpty)
                                 GestureDetector(
-                                  onTap: _toggleSelectMode,
+                                  onTap: () => _toggleSelectMode(allGroupKeys: _getGroupKeys(filtered)),
                                   child: Text(
                                     _isSelectMode ? '취소' : '선택',
                                     style: AppTypography.bodySmall.copyWith(
@@ -397,18 +428,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                           ),
                         )
                       else
-                        ...filtered.map(_buildTransactionItem),
-                      // 공유받은 거래 (그룹 모드일 때)
-                      if (_isGroupMode && _sharedTransactions.isNotEmpty) ...[
-                        SizedBox(height: AppSpacing.md),
-                        ..._sharedTransactions
-                            .where((raw) {
-                              // 내 거래는 이미 위에서 표시됨 → 중복 제거
-                              final txId = raw['id'] as String;
-                              return !filtered.any((t) => t.id == txId);
-                            })
-                            .map(_buildSharedTransactionItem),
-                      ],
+                        ..._buildGroupedTransactions(filtered),
                       // 선택 모드 삭제 바
                       if (_isSelectMode && _selectedIds.isNotEmpty)
                         Padding(
@@ -1012,176 +1032,160 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  Widget _buildTransactionItem(Transaction tx) {
-    final isIncome = tx.type == TransactionType.income;
-    final amount = tx.amount;
-    final isSelected = _selectedIds.contains(tx.id);
+  /// 그룹핑된 거래를 그룹 키 목록과 함께 반환 (선택 모드에서 사용)
+  List<String> _getGroupKeys(List<Transaction> transactions) {
+    final keys = <String>[];
+    final incomes = transactions.where((t) => t.type == TransactionType.income).toList();
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    for (final tx in incomes) {
+      final key = 'income_${tx.paymentMethod ?? '기타소득'}';
+      if (!keys.contains(key)) keys.add(key);
+    }
+    for (final tx in expenses) {
+      final method = tx.paymentMethod;
+      final label = (method != null && method.contains('카드')) ? method : (method ?? '기타');
+      final key = 'expense_$label';
+      if (!keys.contains(key)) keys.add(key);
+    }
+    return keys;
+  }
 
-    Widget card = GestureDetector(
-      onTap: _isSelectMode
-          ? () => _toggleSelection(tx.id)
-          : () => _showEditEntrySheet(tx),
-      child: Container(
-        margin: EdgeInsets.only(bottom: AppSpacing.sm),
-        child: AlCard(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
-            children: [
-              // 선택 모드: 체크박스
-              if (_isSelectMode) ...[
-                Icon(
-                  isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
-                  size: 22,
-                  color: isSelected ? AppColors.emerald600 : AppColors.gray300,
-                ),
-                SizedBox(width: AppSpacing.md),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+  // 공유 거래의 소유자 정보 (txId → {name, nickname, color})
+  final Map<String, ({String name, String? nickname, String? color})> _sharedTxOwners = {};
+
+  List<Widget> _buildGroupedTransactions(List<Transaction> myTransactions) {
+    // 그룹 모드일 때 공유 거래를 합침
+    final transactions = [...myTransactions];
+    _sharedTxOwners.clear();
+
+    if (_isGroupMode && _sharedTransactions.isNotEmpty) {
+      for (final raw in _sharedTransactions) {
+        final txId = raw['id'] as String;
+        // 내 거래와 중복 제거
+        if (myTransactions.any((t) => t.id == txId)) continue;
+        try {
+          final tx = Transaction.fromMap(raw);
+          transactions.add(tx);
+          final owner = raw['user'] as Map<String, dynamic>? ?? {};
+          _sharedTxOwners[txId] = (
+            name: owner['name'] as String? ?? '',
+            nickname: raw['_nickname'] as String?,
+            color: raw['_color'] as String?,
+          );
+        } catch (_) {}
+      }
+    }
+
+    if (transactions.isEmpty) return [];
+
+    final incomes = transactions.where((t) => t.type == TransactionType.income).toList();
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final showIncome = _txFilter == null || _txFilter == TransactionType.income;
+    final showExpense = _txFilter == null || _txFilter == TransactionType.expense;
+
+    final widgets = <Widget>[];
+
+    // 수입: 소득 구분별
+    if (showIncome && incomes.isNotEmpty) {
+      final grouped = <String, List<Transaction>>{};
+      for (final tx in incomes) {
+        final key = tx.paymentMethod ?? '기타소득';
+        grouped.putIfAbsent(key, () => []).add(tx);
+      }
+      for (final entry in grouped.entries) {
+        final groupKey = 'income_${entry.key}';
+        final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
+        widgets.add(_buildTxGroupCard(groupKey, entry.key, entry.value, groupTotal, AppColors.emerald600));
+      }
+    }
+
+    // 지출: 지불 방법별
+    if (showExpense && expenses.isNotEmpty) {
+      final grouped = <String, List<Transaction>>{};
+      for (final tx in expenses) {
+        final method = tx.paymentMethod;
+        final label = (method != null && method.contains('카드')) ? method : (method ?? '기타');
+        grouped.putIfAbsent(label, () => []).add(tx);
+      }
+      for (final entry in grouped.entries) {
+        final groupKey = 'expense_${entry.key}';
+        final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
+        widgets.add(_buildTxGroupCard(groupKey, entry.key, entry.value, groupTotal, AppColors.red600));
+      }
+    }
+
+    return widgets;
+  }
+
+  Widget _buildTxGroupCard(String groupKey, String label, List<Transaction> items, int total, Color color) {
+    final isExpanded = _expandedTxGroups.contains(groupKey) || _isSelectMode;
+    final myCount = items.where((t) => !_sharedTxOwners.containsKey(t.id)).length;
+    final sharedCount = items.length - myCount;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppSpacing.md),
+      child: AlCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            // 그룹 헤더
+            InkWell(
+              onTap: _isSelectMode ? null : () => setState(() {
+                if (_expandedTxGroups.contains(groupKey)) {
+                  _expandedTxGroups.remove(groupKey);
+                } else {
+                  _expandedTxGroups.add(groupKey);
+                }
+              }),
+              borderRadius: isExpanded
+                  ? BorderRadius.only(topLeft: Radius.circular(AppRadius.lg), topRight: Radius.circular(AppRadius.lg))
+                  : AppRadius.lgAll,
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.cardPadding),
+                child: Row(
                   children: [
-                    Text(tx.name, style: AppTypography.bodyLarge),
-                    SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        AlBadge.category(tx.category),
-                        SizedBox(width: AppSpacing.sm),
-                        Text(tx.subCategory, style: AppTypography.bodySmall),
-                        if (tx.paymentMethod != null && tx.paymentMethod!.contains('카드')) ...[
-                          SizedBox(width: AppSpacing.sm),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.blue50,
-                              borderRadius: AppRadius.fullAll,
-                            ),
-                            child: Text(
-                              tx.paymentMethod!,
-                              style: AppTypography.caption.copyWith(
-                                fontSize: 10,
-                                color: AppColors.blue600,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: AppRadius.smAll),
+                      child: Center(child: Text('${items.length}', style: AppTypography.label.copyWith(color: color))),
                     ),
-                    SizedBox(height: AppSpacing.xs),
-                    Row(
+                    SizedBox(width: AppSpacing.md),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption),
-                        if (tx.editedBy != null) ...[
-                          SizedBox(width: AppSpacing.sm),
-                          _buildEditorBadge(tx.editedBy!),
-                        ],
+                        Text(label, style: AppTypography.label),
+                        SizedBox(height: 2),
+                        Row(children: [
+                          Text('$myCount건', style: AppTypography.caption),
+                          if (sharedCount > 0) ...[
+                            SizedBox(width: AppSpacing.xs),
+                            Text('· 공유 $sharedCount건', style: AppTypography.caption.copyWith(color: AppColors.teal500)),
+                          ],
+                        ]),
                       ],
+                    )),
+                    Text(formatKoreanWon(total), style: AppTypography.amountSmall.copyWith(color: color)),
+                    SizedBox(width: AppSpacing.sm),
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0,
+                      duration: Duration(milliseconds: 200),
+                      child: Icon(LucideIcons.chevronDown, size: 20, color: AppColors.gray400),
                     ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            // 펼쳐진 거래 목록
+            AnimatedCrossFade(
+              firstChild: SizedBox.shrink(),
+              secondChild: Column(
                 children: [
-                  Text(
-                    '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
-                    style: AppTypography.amountSmall.copyWith(
-                      color: isIncome ? AppColors.green600 : AppColors.red600,
-                    ),
-                  ),
+                  Divider(height: 1, color: AppColors.gray100),
+                  ...items.map((tx) => _buildInlineTransactionItem(tx)),
                 ],
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    // 선택 모드가 아닐 때만 스와이프 삭제
-    if (_isSelectMode) return card;
-
-    return Dismissible(
-      key: ValueKey(tx.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        bool confirmed = false;
-        await AlConfirmDialog.show(
-          context: context,
-          title: '거래 삭제',
-          message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-          onConfirm: () => confirmed = true,
-        );
-        if (confirmed) {
-          await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
-          if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
-        }
-        // 항상 false를 반환하여 Dismissible이 직접 위젯을 제거하지 않도록 함
-        // 대신 notifier의 invalidateSelf()가 목록을 리빌드하여 자연스럽게 제거됨
-        return false;
-      },
-      background: Container(
-        margin: EdgeInsets.only(bottom: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.red600,
-          borderRadius: AppRadius.lgAll,
-        ),
-        alignment: Alignment.centerRight,
-        padding: EdgeInsets.only(right: AppSpacing.xl),
-        child: Icon(LucideIcons.trash2, color: Colors.white, size: 20),
-      ),
-      child: card,
-    );
-  }
-
-  Widget _buildSharedTransactionItem(Map<String, dynamic> raw) {
-    final type = raw['type'] as String? ?? 'expense';
-    final isIncome = type == 'income';
-    final name = raw['name'] as String? ?? '';
-    final amount = (raw['amount'] as num?)?.toInt() ?? 0;
-    final date = raw['date'] as String? ?? '';
-    final category = raw['category'] as String? ?? '';
-    final subCategory = raw['subCategory'] as String? ?? raw['sub_category'] as String? ?? '';
-    final owner = raw['user'] as Map<String, dynamic>? ?? {};
-    final ownerName = owner['name'] as String? ?? '';
-
-    return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.sm),
-      child: AlCard(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-        child: Row(
-          children: [
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: AppTypography.bodyLarge),
-                SizedBox(height: AppSpacing.xs),
-                Row(children: [
-                  AlBadge.category(category),
-                  SizedBox(width: AppSpacing.sm),
-                  Text(subCategory, style: AppTypography.bodySmall),
-                ]),
-                SizedBox(height: AppSpacing.xs),
-                Row(children: [
-                  Text(date.length >= 10 ? date.substring(0, 10) : date, style: AppTypography.caption),
-                  SizedBox(width: AppSpacing.sm),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(color: AppColors.teal500.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(LucideIcons.users, size: 10, color: AppColors.teal500),
-                      SizedBox(width: 3),
-                      Text(ownerName, style: AppTypography.caption.copyWith(color: AppColors.teal500, fontSize: 10, fontWeight: FontWeight.w600)),
-                    ]),
-                  ),
-                ]),
-              ],
-            )),
-            Text(
-              '${isIncome ? '+' : '-'}${formatKoreanWon(amount)}',
-              style: AppTypography.amountSmall.copyWith(color: isIncome ? AppColors.green600 : AppColors.red600),
+              crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: Duration(milliseconds: 200),
             ),
           ],
         ),
@@ -1189,25 +1193,93 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  Widget _buildEditorBadge(String name) {
-    final isMe = name == '나';
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isMe ? LucideIcons.user : LucideIcons.users,
-          size: 10,
-          color: isMe ? AppColors.gray400 : AppColors.blue600,
+  // 작성자별 색상 매핑
+  static const _ownerColors = [
+    AppColors.teal500,
+    AppColors.purple600,
+    AppColors.blue600,
+    Color(0xFFF59E0B),
+    AppColors.red600,
+  ];
+  final Map<String, Color> _ownerColorMap = {};
+
+  Color _getOwnerColor(String ownerName) {
+    return _ownerColorMap.putIfAbsent(ownerName, () {
+      return _ownerColors[_ownerColorMap.length % _ownerColors.length];
+    });
+  }
+
+  /// 그룹 카드 안에서 표시되는 거래 항목 (라운드 없이 카드 내부 스타일)
+  Widget _buildInlineTransactionItem(Transaction tx) {
+    final isIncome = tx.type == TransactionType.income;
+    final isShared = _sharedTxOwners.containsKey(tx.id);
+    final ownerInfo = _sharedTxOwners[tx.id];
+    final ownerName = ownerInfo?.nickname ?? ownerInfo?.name;
+    final ownerColor = ownerInfo?.color != null
+        ? Color(int.parse('FF${ownerInfo!.color!.substring(1)}', radix: 16))
+        : (isShared && ownerName != null ? _getOwnerColor(ownerName) : AppColors.teal500);
+
+    return GestureDetector(
+      onTap: _isSelectMode
+          ? (isShared ? null : () => _toggleSelection(tx.id))
+          : (isShared ? null : () => _showEditEntrySheet(tx)),
+      onLongPress: (_isSelectMode || isShared) ? null : () {
+        AlConfirmDialog.show(
+          context: context,
+          title: '거래 삭제',
+          message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+          onConfirm: () async {
+            await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
+            if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+          },
+        );
+      },
+      child: Container(
+        decoration: isShared ? BoxDecoration(
+          color: ownerColor.withValues(alpha: 0.04),
+        ) : null,
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
+        child: Row(
+          children: [
+            if (_isSelectMode && !isShared) ...[
+              Icon(
+                _selectedIds.contains(tx.id) ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                size: 20, color: _selectedIds.contains(tx.id) ? AppColors.emerald600 : AppColors.gray300,
+              ),
+              SizedBox(width: AppSpacing.md),
+            ],
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tx.name, style: AppTypography.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 1),
+                SizedBox(height: AppSpacing.xs),
+                Row(children: [
+                  Text(tx.category, style: AppTypography.caption),
+                  SizedBox(width: AppSpacing.sm),
+                  Text(tx.subCategory, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
+                  SizedBox(width: AppSpacing.sm),
+                  Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
+                  if (isShared && ownerName != null) ...[
+                    SizedBox(width: AppSpacing.sm),
+                    Flexible(child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
+                      child: Text(ownerName, style: AppTypography.caption.copyWith(color: ownerColor, fontSize: 10, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
+                    )),
+                  ],
+                ]),
+              ],
+            )),
+            Text(
+              '${isIncome ? '+' : '-'}${formatKoreanWon(tx.amount)}',
+              style: AppTypography.bodyMedium.copyWith(
+                color: isIncome ? AppColors.green600 : AppColors.red600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 3),
-        Text(
-          name,
-          style: AppTypography.caption.copyWith(
-            fontSize: 10,
-            color: isMe ? AppColors.gray400 : AppColors.blue600,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1220,8 +1292,9 @@ class _ManualEntryForm extends StatefulWidget {
   final void Function(Map<String, dynamic>) onSubmit;
   final Map<String, dynamic>? initialData;
   final List<Map<String, dynamic>> shareGroups;
+  final List<String> initialShareGroupIds;
 
-  const _ManualEntryForm({required this.onSubmit, this.initialData, this.shareGroups = const []});
+  const _ManualEntryForm({required this.onSubmit, this.initialData, this.shareGroups = const [], this.initialShareGroupIds = const []});
 
   bool get isEditMode => initialData != null;
 
@@ -1237,10 +1310,11 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   String _selectedSubCategory = '급여';
   DateTime _selectedDate = DateTime.now();
 
-  // 수입: 입금 계좌
-  PaymentMethod _selectedIncomeAccount = PaymentMethod.salaryAccount;
+  // 수입: 소득 구분
+  IncomeSource _selectedIncomeSource = IncomeSource.earned;
 
-  // 지출: 결제 수단 (카드 외)
+  // 지출: 지불 방법
+  bool _isCreditCardMode = false;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.bankTransfer;
 
   // 지출 > 신용카드: 카드 종류
@@ -1296,16 +1370,25 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       }
 
       // 수입 관련
-      _selectedIncomeAccount = PaymentMethod.fromString(data['incomeAccount'] as String? ?? '') ?? PaymentMethod.salaryAccount;
+      _selectedIncomeSource = IncomeSource.fromString(data['incomeSource'] as String? ?? 'earned');
 
       // 지출 관련
-      _selectedPaymentMethod = PaymentMethod.fromString(data['paymentMethod'] as String? ?? '') ?? PaymentMethod.bankTransfer;
-      _selectedCreditCard = PaymentMethod.fromString(data['creditCard'] as String? ?? '') ?? PaymentMethod.shinhan;
+      final pm = data['paymentMethod'] as String? ?? '';
+      if (pm.contains('카드')) {
+        _isCreditCardMode = true;
+        _selectedCreditCard = PaymentMethod.fromString(pm) ?? PaymentMethod.shinhan;
+      } else {
+        _isCreditCardMode = false;
+        _selectedPaymentMethod = PaymentMethod.fromString(pm) ?? PaymentMethod.bankTransfer;
+      }
       _selectedTransferAccount = data['transferAccount'] as String? ?? _transferAccounts.first;
       _isInstallment = data['isInstallment'] == 'true';
       _installmentMonthsController.text = data['installmentMonths'] as String? ?? '';
       _installmentRoundController.text = data['installmentRound'] as String? ?? '';
     }
+
+    // 초기 공유 그룹 선택 상태
+    _selectedGroupIds.addAll(widget.initialShareGroupIds);
   }
 
   @override
@@ -1349,11 +1432,9 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
     };
 
     if (_type == 'income') {
-      entry['paymentMethod'] = _selectedIncomeAccount.value;
+      entry['paymentMethod'] = _selectedIncomeSource.value;
     } else {
-      final isCreditCard = cardCompanies.contains(_selectedCreditCard) &&
-          _selectedPaymentMethod == PaymentMethod.bankTransfer;
-      if (isCreditCard) {
+      if (_isCreditCardMode) {
         entry['paymentMethod'] = _selectedCreditCard.value;
         entry['isInstallment'] = _isInstallment;
         if (_isInstallment) {
@@ -1457,35 +1538,36 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
 
         // ── 수입: 입금 계좌 ──
         if (_type == 'income') ...[
-          Text('입금 계좌', style: AppTypography.label),
+          Text('소득 구분', style: AppTypography.label),
           SizedBox(height: AppSpacing.sm),
-          _buildEnumDropdown<PaymentMethod>(
-            value: _selectedIncomeAccount,
-            items: incomeAccounts,
-            labelOf: (e) => e.value,
-            onChanged: (val) => setState(() => _selectedIncomeAccount = val!),
+          _buildEnumDropdown<IncomeSource>(
+            value: _selectedIncomeSource,
+            items: IncomeSource.values,
+            labelOf: (e) => e.label,
+            onChanged: (val) => setState(() => _selectedIncomeSource = val!),
           ),
           SizedBox(height: AppSpacing.lg),
         ],
 
-        // ── 지출: 결제 수단 ──
+        // ── 지출: 지불 방법 ──
         if (_type == 'expense') ...[
-          Text('결제 수단', style: AppTypography.label),
+          Text('지불 방법', style: AppTypography.label),
           SizedBox(height: AppSpacing.sm),
           // 신용카드 vs 기타
           _buildEnumDropdown<PaymentMethod>(
-            value: cardCompanies.contains(_selectedCreditCard)
-                ? PaymentMethod.shinhan // 카드 선택 중임을 표시하기 위한 sentinel
+            value: _isCreditCardMode
+                ? PaymentMethod.shinhan
                 : _selectedPaymentMethod,
             items: [PaymentMethod.shinhan, ...expensePaymentMethods],
             labelOf: (e) => e == PaymentMethod.shinhan ? '신용카드' : e.value,
             onChanged: (val) {
               setState(() {
                 if (val == PaymentMethod.shinhan) {
+                  _isCreditCardMode = true;
                   _selectedCreditCard = PaymentMethod.shinhan;
                 } else {
+                  _isCreditCardMode = false;
                   _selectedPaymentMethod = val!;
-                  _selectedCreditCard = PaymentMethod.shinhan;
                 }
               });
             },
@@ -1493,8 +1575,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           SizedBox(height: AppSpacing.lg),
 
           // 지출 > 신용카드 선택 시: 카드 종류 + 할부
-          if (cardCompanies.contains(_selectedCreditCard) ||
-              _selectedPaymentMethod == PaymentMethod.shinhan) ...[
+          if (_isCreditCardMode) ...[
             Text('카드 종류', style: AppTypography.label),
             SizedBox(height: AppSpacing.sm),
             _buildEnumDropdown<PaymentMethod>(
@@ -1733,8 +1814,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           ],
 
           // 지출 > 계좌이체 선택 시: 출금 계좌
-          if (_selectedPaymentMethod == PaymentMethod.bankTransfer &&
-              !cardCompanies.contains(_selectedCreditCard)) ...[
+          if (!_isCreditCardMode && _selectedPaymentMethod == PaymentMethod.bankTransfer) ...[
             Text('출금 계좌', style: AppTypography.label),
             SizedBox(height: AppSpacing.sm),
             _buildDropdown(
@@ -1779,7 +1859,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           },
         ),
         // 공유 그룹 선택
-        if (widget.shareGroups.isNotEmpty && !widget.isEditMode) ...[
+        if (widget.shareGroups.isNotEmpty) ...[
           SizedBox(height: AppSpacing.xl),
           Text('공유 그룹', style: AppTypography.label),
           SizedBox(height: AppSpacing.sm),

@@ -49,11 +49,15 @@ class ShareGroupService {
   Future<Map<String, dynamic>> inviteToGroup(
     String groupId, {
     required String toEmail,
+    String? nickname,
+    String? color,
     String? message,
   }) async {
     try {
       final response = await _dio.post('/share-groups/$groupId/invite', data: {
         'toEmail': toEmail,
+        if (nickname != null) 'nickname': nickname,
+        if (color != null) 'color': color,
         if (message != null) 'message': message,
       });
       return _unwrap(response);
@@ -116,9 +120,34 @@ class ShareGroupService {
     }
   }
 
+  Future<List<String>> getItemSharedGroups(String itemType, String itemId) async {
+    try {
+      final response = await _dio.get('/share-groups/item-groups', queryParameters: {
+        'itemType': itemType,
+        'itemId': itemId,
+      });
+      final body = response.data;
+      final data = body is Map<String, dynamic> && body.containsKey('data') ? body['data'] : body;
+      return (data as List).cast<String>();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   Future<void> unshareItem(String groupId, String sharedItemId) async {
     try {
       await _dio.delete('/share-groups/$groupId/items/$sharedItemId');
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  // ─── 활동 이력 ─────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getActivityLogs(String groupId) async {
+    try {
+      final response = await _dio.get('/share-groups/$groupId/activity');
+      return _unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

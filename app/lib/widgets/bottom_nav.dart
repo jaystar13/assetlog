@@ -37,7 +37,7 @@ class BottomNav extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () => navigationShell.goBranch(
                       index,
-                      initialLocation: index == navigationShell.currentIndex,
+                      initialLocation: true,
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

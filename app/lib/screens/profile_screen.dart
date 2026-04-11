@@ -8,8 +8,11 @@ import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
+import '../design_system/components/al_bottom_sheet.dart';
+import '../design_system/components/al_input.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
+import '../utils/snackbar_helper.dart';
 import '../utils/user_preferences.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -104,9 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               label: '프로필 수정',
               variant: AlButtonVariant.secondary,
               icon: Icon(LucideIcons.pencil, size: 16, color: AppColors.gray700),
-              onPressed: () {
-                // TODO: 프로필 수정 기능 구현
-              },
+              onPressed: () => _showEditProfileSheet(user),
             ),
           ],
         ),
@@ -195,23 +196,77 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Widget _buildActivityCard() {
-    // TODO: 실제 데이터로 교체 (Phase 3 후반)
-    return AlCard(
+  void _showEditProfileSheet(Map<String, dynamic>? user) {
+    final nameController = TextEditingController(text: user?['name'] as String? ?? '');
+
+    AlBottomSheet.show(
+      context: context,
+      title: '프로필 수정',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('활동 요약', style: AppTypography.heading3),
-          SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(child: _buildStatItem('등록 자산', '-', LucideIcons.wallet)),
-              Expanded(child: _buildStatItem('이번 달 거래', '-', LucideIcons.arrowLeftRight)),
-              Expanded(child: _buildStatItem('공유 멤버', '-', LucideIcons.users)),
-            ],
+          AlInput(label: '이름', placeholder: '이름을 입력하세요', controller: nameController),
+          SizedBox(height: AppSpacing.xl),
+          AlButton(
+            label: '저장',
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                showErrorSnackBar(context, '이름을 입력해 주세요');
+                return;
+              }
+              Navigator.of(context).pop();
+
+              try {
+                await ref.read(authServiceProvider).updateProfile(name: name);
+                await ref.read(authNotifierProvider.notifier).checkAuthStatus();
+                if (mounted) showSuccessSnackBar(context, '프로필이 수정되었습니다');
+              } catch (e) {
+                if (mounted) showErrorSnackBar(context, '수정 실패: $e');
+              }
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActivityCard() {
+    final now = DateTime.now();
+    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+    return FutureBuilder<List<dynamic>>(
+      future: Future.wait([
+        ref.read(assetServiceProvider).getAssets(),
+        ref.read(transactionServiceProvider).getTransactions(month: month),
+        ref.read(shareGroupServiceProvider).getMyGroups(),
+      ]),
+      builder: (context, snapshot) {
+        final assetCount = snapshot.hasData ? (snapshot.data![0] as List).length : 0;
+        final txCount = snapshot.hasData ? (snapshot.data![1] as List).length : 0;
+        final groups = snapshot.hasData ? (snapshot.data![2] as List) : [];
+        int memberCount = 0;
+        for (final g in groups) {
+          final members = (g as Map<String, dynamic>)['members'] as List?;
+          if (members != null) memberCount += members.length;
+        }
+
+        return AlCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('활동 요약', style: AppTypography.heading3),
+              SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(child: _buildStatItem('등록 자산', '$assetCount', LucideIcons.wallet)),
+                  Expanded(child: _buildStatItem('이번 달 거래', '$txCount', LucideIcons.arrowLeftRight)),
+                  Expanded(child: _buildStatItem('공유 멤버', '$memberCount', LucideIcons.users)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -173,11 +173,30 @@ const Map<String, List<String>> categorySubCategoryMap = {
   '투자비': ['구독(AI)', '구독(인프라)', '대출(원금)', '대출(이자)'],
 };
 
-// ─── Payment Method ──────────────────────────────────────────────────────────
+// ─── Income Source (소득 구분) ───────────────────────────────────────────────
+
+enum IncomeSource {
+  earned('근로소득', '근로소득'),
+  business('사업소득', '사업소득'),
+  interest('이자소득', '이자소득'),
+  dividend('배당소득', '배당소득'),
+  rental('임대소득', '임대소득'),
+  pension('연금소득', '연금소득'),
+  other('기타소득', '기타소득');
+
+  const IncomeSource(this.value, this.label);
+  final String value;
+  final String label;
+
+  static IncomeSource fromString(String s) =>
+      values.firstWhere((e) => e.value == s, orElse: () => earned);
+}
+
+// ─── Payment Method (지불 방법) ─────────────────────────────────────────────
 // payment-method.constants.ts (백엔드)와 value 값이 반드시 일치해야 합니다.
 
 enum PaymentMethod {
-  // 카드사
+  // 신용카드
   shinhan('신한카드'),
   kbNational('KB국민카드'),
   hyundai('현대카드'),
@@ -187,14 +206,9 @@ enum PaymentMethod {
   nhNongHyup('NH농협카드'),
   woori('우리카드'),
   bc('BC카드'),
-  // 카드 외 지출 수단
+  // 카드 외
   bankTransfer('계좌이체'),
-  cash('현금'),
-  // 수입 계좌
-  salaryAccount('급여계좌'),
-  pensionAccount('퇴직연금계좌'),
-  investmentAccount('투자수익계좌'),
-  sideIncomeAccount('부수입계좌');
+  cash('현금');
 
   const PaymentMethod(this.value);
   final String value;
@@ -222,10 +236,3 @@ const List<PaymentMethod> expensePaymentMethods = [
   PaymentMethod.cash,
 ];
 
-// 수입 계좌
-const List<PaymentMethod> incomeAccounts = [
-  PaymentMethod.salaryAccount,
-  PaymentMethod.pensionAccount,
-  PaymentMethod.investmentAccount,
-  PaymentMethod.sideIncomeAccount,
-];

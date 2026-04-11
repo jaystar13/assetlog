@@ -130,44 +130,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  void _showSubtitleEditDialog() {
-    final controller = TextEditingController(text: _prefs.subtitle);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
-        title: Text('한 줄 소개', style: AppTypography.heading3),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 20,
-          decoration: InputDecoration(
-            hintText: '나만의 한 줄 소개를 입력하세요',
-            hintStyle: AppTypography.bodyMedium.copyWith(
-              color: AppColors.gray400,
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.emerald600),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('취소', style: TextStyle(color: AppColors.gray600)),
-          ),
-          TextButton(
-            onPressed: () {
-              _prefs.setSubtitle(controller.text);
-              Navigator.of(ctx).pop();
-            },
-            child: Text('저장', style: TextStyle(color: AppColors.emerald600)),
-          ),
-        ],
-      ),
-    );
-  }
-
   // dashboard 데이터 헬퍼 — build()에서 세팅
   HomeDashboard? _dashboard;
 
@@ -325,24 +287,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
                     SizedBox(height: AppSpacing.xs),
-                    GestureDetector(
-                      onTap: _showSubtitleEditDialog,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _prefs.subtitle,
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            LucideIcons.pencil,
-                            size: 12,
-                            color: Colors.white.withValues(alpha: 0.5),
-                          ),
-                        ],
+                    Text(
+                      _prefs.subtitle,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ],

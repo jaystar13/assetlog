@@ -509,12 +509,14 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             ..._myGroups.map((g) {
               final gId = g['id'] as String;
               final gName = g['name'] as String;
+              final memberCount = (g['members'] as List?)?.length ?? 0;
+              final displayName = '$gName(${memberCount}명)';
               final sel = _selectedGroupId == gId;
               return ListTile(
                 leading: Icon(LucideIcons.users, color: sel ? AppColors.emerald600 : AppColors.gray500),
-                title: Text(gName, style: AppTypography.bodyLarge),
+                title: Text(displayName, style: AppTypography.bodyLarge),
                 trailing: sel ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
-                onTap: () { setState(() { _selectedGroupId = gId; _selectedGroupName = gName; }); Navigator.pop(ctx); },
+                onTap: () { setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; }); Navigator.pop(ctx); },
               );
             }),
           ],
@@ -590,51 +592,6 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
     } catch (_) {}
   }
 
-  Widget _buildSharedAssetItem(Map<String, dynamic> raw) {
-    final name = raw['name'] as String? ?? '';
-    final catId = raw['categoryId'] as String? ?? '';
-    final history = raw['valueHistory'] as List<dynamic>? ?? [];
-    final value = history.isNotEmpty ? (history.first['value'] as num).toInt() : 0;
-    final owner = raw['user'] as Map<String, dynamic>? ?? {};
-    final ownerName = owner['name'] as String? ?? '';
-    final catConfig = {
-      'real-estate': ('부동산', LucideIcons.home, AppColors.blue600),
-      'stocks': ('주식', LucideIcons.trendingUp, AppColors.green600),
-      'cash': ('현금', LucideIcons.banknote, AppColors.purple600),
-      'loans': ('부채', LucideIcons.creditCard, AppColors.red600),
-    };
-    final config = catConfig[catId];
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
-      child: Row(
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: config?.$3 ?? AppColors.gray400, shape: BoxShape.circle)),
-          SizedBox(width: AppSpacing.md),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500)),
-              SizedBox(height: 2),
-              Row(children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: AppColors.teal500.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(LucideIcons.users, size: 10, color: AppColors.teal500),
-                    SizedBox(width: 3),
-                    Text(ownerName, style: AppTypography.caption.copyWith(color: AppColors.teal500, fontSize: 10, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              ]),
-            ],
-          )),
-          Text(formatKoreanWon(value), style: AppTypography.amountSmall),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAssetContent() {
     if (_isGroupMode) _loadSharedAssets();
     // 그룹 모드 해제 시 공유 데이터 클리어
@@ -657,27 +614,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             SizedBox(height: AppSpacing.lg),
             _buildPieChartCard(groups),
             SizedBox(height: AppSpacing.sectionGap),
-            ...groups.map((group) => Padding(
-                  key: ValueKey(group.id),
-                  padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                  child: _buildAssetGroupCard(group),
-                )),
-            // 공유받은 자산 (그룹 모드일 때)
-            if (_isGroupMode && _sharedAssets.isNotEmpty) ...[
-              SizedBox(height: AppSpacing.lg),
-              Row(children: [
-                Icon(LucideIcons.users, size: 16, color: AppColors.teal500),
-                SizedBox(width: AppSpacing.sm),
-                Text('공유받은 자산', style: AppTypography.heading3.copyWith(color: AppColors.teal500)),
-              ]),
-              SizedBox(height: AppSpacing.md),
-              AlCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: _sharedAssets.map(_buildSharedAssetItem).toList(),
-                ),
-              ),
-            ],
+            ...groups.map((group) {
+              // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
+              final sharedInCategory = _isGroupMode
+                  ? _sharedAssets.where((a) => a['categoryId'] == group.id).toList()
+                  : <Map<String, dynamic>>[];
+              return Padding(
+                key: ValueKey(group.id),
+                padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                child: _buildAssetGroupCard(group, sharedAssets: sharedInCategory),
+              );
+            }),
             SizedBox(height: AppSpacing.lg),
             _buildAddAssetButton(),
             SizedBox(height: AppSpacing.sectionGap),
@@ -788,7 +735,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
   // ─── Asset Group Card ────────────────────────────────────────────────
 
-  Widget _buildAssetGroupCard(AssetGroup group) {
+  Widget _buildAssetGroupCard(AssetGroup group, {List<Map<String, dynamic>> sharedAssets = const []}) {
     final isExpanded = _expandedGroups.contains(group.id);
     final categoryColors = group.colors;
 
@@ -831,10 +778,13 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                       children: [
                         Text(group.name, style: AppTypography.label),
                         SizedBox(height: 2),
-                        Text(
-                          '${group.items.length}개 항목',
-                          style: AppTypography.bodySmall,
-                        ),
+                        Row(children: [
+                          Text('${group.items.length}개', style: AppTypography.bodySmall),
+                          if (sharedAssets.isNotEmpty) ...[
+                            SizedBox(width: AppSpacing.xs),
+                            Text('· 공유 ${sharedAssets.length}개', style: AppTypography.bodySmall.copyWith(color: AppColors.teal500)),
+                          ],
+                        ]),
                       ],
                     ),
                   ),
@@ -875,7 +825,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           // Expanded content
           AnimatedCrossFade(
             firstChild: SizedBox.shrink(),
-            secondChild: _buildExpandedContent(group),
+            secondChild: _buildExpandedContent(group, sharedAssets: sharedAssets),
             crossFadeState: isExpanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
@@ -886,7 +836,24 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
     );
   }
 
-  Widget _buildExpandedContent(AssetGroup group) {
+  // 멤버 색상/별명 매핑 (공유 자산 표시용)
+  Color _getMemberColor(String? hex) {
+    if (hex == null) return AppColors.teal500;
+    try { return Color(int.parse('FF${hex.substring(1)}', radix: 16)); } catch (_) { return AppColors.teal500; }
+  }
+
+  Widget _buildExpandedContent(AssetGroup group, {List<Map<String, dynamic>> sharedAssets = const []}) {
+    // 멤버 정보 캐시 (그룹 선택 시 _myGroups에서 가져옴)
+    final currentGroup = _myGroups.where((g) => g['id'] == _selectedGroupId).firstOrNull;
+    final members = (currentGroup?['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final memberNicknames = <String, String>{};
+    final memberColors = <String, String?>{};
+    for (final m in members) {
+      final uid = (m['user'] as Map?)?['id'] as String? ?? '';
+      memberNicknames[uid] = m['nickname'] as String? ?? (m['user'] as Map?)?['name'] as String? ?? '';
+      memberColors[uid] = m['color'] as String?;
+    }
+
     return Column(
       children: [
         Divider(
@@ -895,8 +862,41 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           indent: AppSpacing.cardPadding,
           endIndent: AppSpacing.cardPadding,
         ),
-        // Individual asset items
+        // 내 자산 항목
         ...group.items.map((item) => _buildAssetItem(item, group)),
+        // 공유받은 자산 항목
+        ...sharedAssets.map((raw) {
+          final name = raw['name'] as String? ?? '';
+          final history = raw['valueHistory'] as List<dynamic>? ?? [];
+          final value = history.isNotEmpty ? (history.first['value'] as num).toInt() : 0;
+          final ownerId = raw['userId'] as String? ?? raw['user_id'] as String? ?? '';
+          final ownerName = memberNicknames[ownerId] ?? (raw['user'] as Map?)?['name'] as String? ?? '';
+          final ownerColor = _getMemberColor(memberColors[ownerId]);
+
+          return Container(
+            decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.04)),
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 1),
+                    SizedBox(height: 2),
+                    Row(children: [
+                      Flexible(child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
+                        child: Text(ownerName, style: AppTypography.caption.copyWith(color: ownerColor, fontSize: 10, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
+                      )),
+                    ]),
+                  ],
+                )),
+                Text(formatKoreanWon(value), style: AppTypography.amountSmall),
+              ],
+            ),
+          );
+        }),
         // Update button
         Padding(
           padding: EdgeInsets.fromLTRB(
@@ -927,17 +927,6 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
       ),
       child: Row(
         children: [
-          // Colored dot
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: group.colors.bg,
-              shape: BoxShape.circle,
-            ),
-          ),
-          SizedBox(width: AppSpacing.md),
-          // Name and last updated
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
