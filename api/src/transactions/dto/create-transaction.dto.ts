@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
-import { ALL_PAYMENT_METHODS } from '../../common/constants/payment-method.constants';
 
 export const TRANSACTION_TYPES = ['income', 'expense'] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
@@ -49,9 +48,9 @@ export class CreateTransactionDto {
   @IsIn(ALL_SUBCATEGORIES)
   subCategory: string;
 
-  @ApiPropertyOptional({ enum: ALL_PAYMENT_METHODS, example: '신한카드', description: '결제수단' })
+  @ApiPropertyOptional({ example: '신한카드', description: '결제수단 또는 소득 구분' })
   @IsOptional()
-  @IsIn(ALL_PAYMENT_METHODS)
+  @IsString()
   paymentMethod?: string;
 
   @ApiPropertyOptional({ example: '2026-03', description: '귀속월 (YYYY-MM) — 생략 시 date 기준으로 조회' })

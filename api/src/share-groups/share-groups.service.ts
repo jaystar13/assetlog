@@ -97,12 +97,14 @@ export class ShareGroupsService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    return this.prisma.groupInvitation.create({
+    const invitation = await this.prisma.groupInvitation.create({
       data: {
         groupId,
         invitedById: userId,
         toEmail: dto.toEmail.toLowerCase(),
         role: 'viewer',
+        nickname: dto.nickname ?? null,
+        color: dto.color ?? null,
         message: dto.message ?? null,
         expiresAt,
       },
@@ -111,6 +113,16 @@ export class ShareGroupsService {
         invitedBy: { select: USER_SELECT },
       },
     });
+
+    await this.logActivity({
+      groupId,
+      actorUserId: userId,
+      action: 'invited',
+      targetEmail: dto.toEmail.toLowerCase(),
+      targetNickname: dto.nickname ?? null,
+    });
+
+    return invitation;
   }
 
   async updateMemberRole(userId: string, groupId: string, memberId: string, dto: UpdateMemberRoleDto) {
@@ -133,11 +145,20 @@ export class ShareGroupsService {
     if (!member || member.groupId !== groupId) throw new NotFoundException('멤버를 찾을 수 없습니다.');
     if (member.userId === userId) throw new BadRequestException('자기 자신은 제거할 수 없습니다.');
 
-    // 해당 멤버가 공유한 항목도 함께 삭제
+    const targetUser = await this.prisma.user.findUnique({ where: { id: member.userId }, select: { email: true } });
+
     await this.prisma.$transaction([
       this.prisma.sharedItem.deleteMany({ where: { groupId, ownerUserId: member.userId } }),
       this.prisma.shareGroupMember.delete({ where: { id: memberId } }),
     ]);
+
+    await this.logActivity({
+      groupId,
+      actorUserId: userId,
+      action: 'member_removed',
+      targetEmail: targetUser?.email ?? null,
+      targetNickname: member.nickname ?? null,
+    });
   }
 
   async leaveGroup(userId: string, groupId: string) {
@@ -151,6 +172,13 @@ export class ShareGroupsService {
       this.prisma.sharedItem.deleteMany({ where: { groupId, ownerUserId: userId } }),
       this.prisma.shareGroupMember.delete({ where: { id: member.id } }),
     ]);
+
+    await this.logActivity({
+      groupId,
+      actorUserId: userId,
+      action: 'member_left',
+      targetNickname: member.nickname ?? null,
+    });
   }
 
   // ─────────────────────── 초대 수신 ───────────────────────
@@ -180,13 +208,15 @@ export class ShareGroupsService {
       throw new BadRequestException('만료된 초대입니다.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.groupInvitation.update({ where: { id: invitationId }, data: { status: 'accepted' } });
       return tx.shareGroupMember.create({
         data: {
           groupId: invitation.groupId,
           userId,
           role: invitation.role,
+          nickname: invitation.nickname,
+          color: invitation.color,
         },
         include: {
           group: { select: { id: true, name: true } },
@@ -194,9 +224,19 @@ export class ShareGroupsService {
         },
       });
     });
+
+    await this.logActivity({
+      groupId: invitation.groupId,
+      actorUserId: userId,
+      action: 'accepted',
+      targetEmail: userEmail,
+      targetNickname: invitation.nickname ?? null,
+    });
+
+    return result;
   }
 
-  async declineInvitation(userEmail: string, invitationId: string) {
+  async declineInvitation(userId: string, userEmail: string, invitationId: string) {
     const invitation = await this.prisma.groupInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation) throw new NotFoundException('초대를 찾을 수 없습니다.');
     if (invitation.toEmail.toLowerCase() !== userEmail.toLowerCase()) {
@@ -206,10 +246,20 @@ export class ShareGroupsService {
       throw new BadRequestException('대기 중인 초대만 거절할 수 있습니다.');
     }
 
-    return this.prisma.groupInvitation.update({
+    const result = await this.prisma.groupInvitation.update({
       where: { id: invitationId },
       data: { status: 'declined' },
     });
+
+    await this.logActivity({
+      groupId: invitation.groupId,
+      actorUserId: userId,
+      action: 'declined',
+      targetEmail: userEmail,
+      targetNickname: invitation.nickname ?? null,
+    });
+
+    return result;
   }
 
   // ─────────────────────── 항목 공유 ───────────────────────
@@ -243,6 +293,14 @@ export class ShareGroupsService {
 
   // ─────────────────────── 공유 데이터 조회 ───────────────────────
 
+  async getItemSharedGroups(userId: string, itemType: string, itemId: string) {
+    const items = await this.prisma.sharedItem.findMany({
+      where: { ownerUserId: userId, itemType, itemId },
+      select: { groupId: true },
+    });
+    return items.map((i) => i.groupId);
+  }
+
   async getGroupTransactions(userId: string, groupId: string, month?: string) {
     await this.assertMember(userId, groupId);
 
@@ -264,6 +322,13 @@ export class ShareGroupsService {
       ];
     }
 
+    // 멤버 정보 (nickname, color) 조회
+    const members = await this.prisma.shareGroupMember.findMany({
+      where: { groupId },
+      select: { userId: true, nickname: true, color: true },
+    });
+    const memberMap = new Map(members.map((m) => [m.userId, { nickname: m.nickname, color: m.color }]));
+
     const transactions = await this.prisma.transaction.findMany({
       where,
       include: { user: { select: USER_SELECT } },
@@ -271,8 +336,8 @@ export class ShareGroupsService {
     });
 
     return transactions.map((tx) => {
-      const si = sharedItems.find((s) => s.itemId === tx.id);
-      return tx;
+      const memberInfo = memberMap.get(tx.userId);
+      return { ...tx, _nickname: memberInfo?.nickname ?? null, _color: memberInfo?.color ?? null };
     });
   }
 
@@ -316,5 +381,27 @@ export class ShareGroupsService {
     const member = await this.assertMember(userId, groupId);
     if (member.role !== 'admin') throw new ForbiddenException('관리자 권한이 필요합니다.');
     return member;
+  }
+
+  // ─────────────────────── 활동 이력 ───────────────────────
+
+  private async logActivity(params: {
+    groupId: string;
+    actorUserId: string;
+    action: string;
+    targetEmail?: string | null;
+    targetNickname?: string | null;
+    memo?: string | null;
+  }) {
+    await this.prisma.groupActivityLog.create({ data: params });
+  }
+
+  findActivityLogs(userId: string, groupId: string) {
+    // 멤버 확인은 컨트롤러에서 처리
+    return this.prisma.groupActivityLog.findMany({
+      where: { groupId },
+      include: { actor: { select: USER_SELECT } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

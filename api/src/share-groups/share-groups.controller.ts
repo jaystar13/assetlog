@@ -38,6 +38,20 @@ export class ShareGroupsController {
     return this.service.findMyGroups(userId);
   }
 
+  // ─── 아이템 공유 상태 조회 (`:id` 라우트 위에 배치) ──
+
+  @Get('item-groups')
+  @ApiOperation({ summary: '특정 아이템이 공유된 그룹 ID 목록' })
+  @ApiQuery({ name: 'itemType', enum: ['transaction', 'asset'] })
+  @ApiQuery({ name: 'itemId', description: '거래 또는 자산 ID' })
+  getItemSharedGroups(
+    @CurrentUser('id') userId: string,
+    @Query('itemType') itemType: string,
+    @Query('itemId') itemId: string,
+  ) {
+    return this.service.getItemSharedGroups(userId, itemType, itemId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '그룹 상세 (멤버 목록)' })
   @ApiParam({ name: 'id', description: '그룹 ID' })
@@ -182,9 +196,21 @@ export class ShareGroupsController {
   @ApiOperation({ summary: '그룹 초대 거절' })
   @ApiParam({ name: 'invId', description: '초대 ID' })
   declineInvitation(
-    @CurrentUser('email') email: string,
+    @CurrentUser() user: { id: string; email: string },
     @Param('invId') invId: string,
   ) {
-    return this.service.declineInvitation(email, invId);
+    return this.service.declineInvitation(user.id, user.email, invId);
+  }
+
+  // ─── 활동 이력 ─────────────────────────────────
+
+  @Get(':id/activity')
+  @ApiOperation({ summary: '그룹 활동 이력 조회' })
+  @ApiParam({ name: 'id', description: '그룹 ID' })
+  getActivityLogs(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.service.findActivityLogs(userId, id);
   }
 }

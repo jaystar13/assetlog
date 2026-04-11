@@ -26,6 +26,7 @@ model User {
   groupMemberships    ShareGroupMember[]
   sharedItems         SharedItem[]         @relation("SharedItemOwner")
   groupInvitationsSent GroupInvitation[]   @relation("GroupInviter")
+  activityLogs        GroupActivityLog[]  @relation("ActivityActor")
 
   @@unique([provider, providerId])
   @@map("users")
@@ -129,9 +130,10 @@ model ShareGroup {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  members     ShareGroupMember[]
-  sharedItems SharedItem[]
-  invitations GroupInvitation[]
+  members      ShareGroupMember[]
+  sharedItems  SharedItem[]
+  invitations  GroupInvitation[]
+  activityLogs GroupActivityLog[]
 
   @@index([createdById])
   @@map("share_groups")
@@ -144,6 +146,8 @@ model ShareGroupMember {
   userId   String   @map("user_id")
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role     String   @default("viewer") // "admin" | "viewer"
+  nickname String?  // 그룹 내 별명 (초대자가 지정)
+  color    String?  // 표시 색상 (hex, 예: "#14B8A6")
   joinedAt DateTime @default(now()) @map("joined_at")
 
   @@unique([groupId, userId])
@@ -180,6 +184,8 @@ model GroupInvitation {
   invitedBy   User     @relation("GroupInviter", fields: [invitedById], references: [id], onDelete: Cascade)
   toEmail     String   @map("to_email")
   role        String   @default("viewer") // 수락 시 부여할 역할
+  nickname    String?  // 초대 대상 별명
+  color       String?  // 초대 대상 표시 색상 (hex)
   status      String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
   message     String?
   sentAt      DateTime @default(now()) @map("sent_at")
@@ -188,6 +194,25 @@ model GroupInvitation {
   @@index([toEmail])
   @@index([groupId])
   @@map("group_invitations")
+}
+
+// ─── GroupActivityLog (그룹 활동 이력) ───────────────────────────────────────
+
+model GroupActivityLog {
+  id             String   @id @default(uuid())
+  groupId        String   @map("group_id")
+  group          ShareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  actorUserId    String   @map("actor_user_id")
+  actor          User     @relation("ActivityActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  action         String   // "invited" | "accepted" | "declined" | "member_removed" | "member_left" | "group_deleted"
+  targetEmail    String?  @map("target_email")
+  targetNickname String?  @map("target_nickname")
+  memo           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([groupId])
+  @@index([actorUserId])
+  @@map("group_activity_logs")
 }
 
 // ─── Seed Tables ─────────────────────────────────────────────────────────────

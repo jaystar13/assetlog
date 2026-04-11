@@ -80,7 +80,6 @@ export class TransactionsService {
           ownerUserId: userId,
           itemType: 'transaction',
           itemId: transaction.id,
-          permission: 'view',
         })),
         skipDuplicates: true,
       });

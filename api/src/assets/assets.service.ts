@@ -46,7 +46,6 @@ export class AssetsService {
           ownerUserId: userId,
           itemType: 'asset',
           itemId: asset.id,
-          permission: 'view',
         })),
         skipDuplicates: true,
       });
