@@ -39,3 +39,6 @@ dist/
 # ── 기타 ──
 *.pyc
 coverage/
+
+# ── Docs ──
+docs/design/
