@@ -36,11 +36,11 @@ class MoreScreen extends ConsumerWidget {
             children: [
               // 프로필 요약 카드
               _buildProfileCard(context, ref),
-              SizedBox(height: AppSpacing.sectionGap),
+              const SizedBox(height: AppSpacing.sectionGap),
 
               // 서비스 섹션
               _buildSectionLabel('서비스'),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               _buildMenuGroup(context, [
                 _MenuItem(
                   icon: LucideIcons.users,
@@ -53,11 +53,11 @@ class MoreScreen extends ConsumerWidget {
                   trailing: _buildComingSoonBadge(),
                 ),
               ]),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
 
               // 앱 설정 섹션
               _buildSectionLabel('앱 설정'),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               _buildMenuGroup(context, [
                 _MenuItem(
                   icon: LucideIcons.palette,
@@ -80,11 +80,11 @@ class MoreScreen extends ConsumerWidget {
                   trailing: _buildComingSoonBadge(),
                 ),
               ]),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
 
               // 정보 섹션
               _buildSectionLabel('정보'),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               _buildMenuGroup(context, [
                 _MenuItem(
                   icon: LucideIcons.info,
@@ -106,7 +106,7 @@ class MoreScreen extends ConsumerWidget {
                   label: '개인정보처리방침',
                 ),
               ]),
-              SizedBox(height: AppSpacing.sectionGap),
+              const SizedBox(height: AppSpacing.sectionGap),
 
               // 로그아웃
               AlButton(
@@ -149,7 +149,7 @@ class MoreScreen extends ConsumerWidget {
         child: Row(
           children: [
             AlAvatar.medium(text: initial, imageUrl: avatar),
-            SizedBox(width: AppSpacing.lg),
+            const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,13 +223,13 @@ class MoreScreen extends ConsumerWidget {
                     child: Row(
                       children: [
                         Icon(item.icon, size: 20, color: AppColors.gray600),
-                        SizedBox(width: AppSpacing.md),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: Text(item.label, style: AppTypography.bodyLarge),
                         ),
                         if (item.trailing != null) ...[
                           item.trailing!,
-                          if (item.showChevron) SizedBox(width: AppSpacing.sm),
+                          if (item.showChevron) const SizedBox(width: AppSpacing.sm),
                         ],
                         if (item.showChevron)
                           Icon(

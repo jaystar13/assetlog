@@ -16,13 +16,12 @@ class TransactionService {
     try {
       final response = await _dio.get(
         '/transactions',
-        queryParameters: {
-          'month': month,
-          if (type != null) 'type': type,
-        },
+        queryParameters: {'month': month, 'type': ?type},
       );
       final data = _unwrapList(response);
-      return data.map((e) => Transaction.fromMap(e as Map<String, dynamic>)).toList();
+      return data
+          .map((e) => Transaction.fromMap(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -50,9 +49,9 @@ class TransactionService {
           'date': date,
           'category': category,
           'subCategory': subCategory,
-          if (paymentMethod != null) 'paymentMethod': paymentMethod,
-          if (targetMonth != null) 'targetMonth': targetMonth,
-          if (shareGroupIds != null) 'shareGroupIds': shareGroupIds,
+          'paymentMethod': ?paymentMethod,
+          'targetMonth': ?targetMonth,
+          'shareGroupIds': ?shareGroupIds,
         },
       );
       return Transaction.fromMap(_unwrap(response));
@@ -62,7 +61,10 @@ class TransactionService {
   }
 
   /// PATCH /transactions/:id
-  Future<Transaction> updateTransaction(String id, Map<String, dynamic> data) async {
+  Future<Transaction> updateTransaction(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
     try {
       final response = await _dio.patch('/transactions/$id', data: data);
       return Transaction.fromMap(_unwrap(response));

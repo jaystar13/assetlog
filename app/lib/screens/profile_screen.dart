@@ -14,6 +14,7 @@ import '../design_system/components/al_input.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../utils/snackbar_helper.dart';
+import '../utils/date_format.dart';
 import '../utils/user_preferences.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -99,18 +100,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Column(
           children: [
             _buildProfileHeader(user),
-            SizedBox(height: AppSpacing.sectionGap),
+            const SizedBox(height: AppSpacing.sectionGap),
             _buildInfoCard(user),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
             _buildActivityCard(),
-            SizedBox(height: AppSpacing.sectionGap),
+            const SizedBox(height: AppSpacing.sectionGap),
             AlButton(
               label: '프로필 수정',
               variant: AlButtonVariant.secondary,
               icon: Icon(LucideIcons.pencil, size: 16, color: AppColors.gray700),
               onPressed: () => _showEditProfileSheet(user),
             ),
-            SizedBox(height: AppSpacing.xxxl),
+            const SizedBox(height: AppSpacing.xxxl),
             GestureDetector(
               onTap: _showWithdrawConfirm,
               child: Text(
@@ -139,14 +140,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       children: [
         AlAvatar.large(text: initial, imageUrl: avatar),
-        SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.lg),
         Text(name, style: AppTypography.heading2),
-        SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           email,
           style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500),
         ),
-        SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.sm),
         GestureDetector(
           onTap: _showSubtitleEditDialog,
           child: Container(
@@ -177,7 +178,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildInfoCard(Map<String, dynamic>? user) {
     final provider = user?['provider'] as String? ?? '-';
     final createdAt = user?['createdAt'] as String? ?? '-';
-    final joinDate = createdAt != '-'
+    final joinDate = createdAt != '-' && createdAt.length >= 10
         ? createdAt.substring(0, 10)
         : '-';
 
@@ -186,7 +187,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('기본 정보', style: AppTypography.heading3),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           _buildInfoRow(LucideIcons.logIn, '로그인 방식', _providerLabel(provider)),
           _buildDivider(),
           _buildInfoRow(LucideIcons.calendarPlus, '가입일', joinDate),
@@ -234,24 +235,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Column(
         children: [
           AlInput(label: '이름', placeholder: '이름을 입력하세요', controller: nameController),
-          SizedBox(height: AppSpacing.xl),
-          AlButton(
+          const SizedBox(height: AppSpacing.xl),
+          _SaveButton(
             label: '저장',
-            onPressed: () async {
+            savingLabel: '저장 중...',
+            onSave: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) {
                 showErrorSnackBar(context, '이름을 입력해 주세요');
                 return;
               }
-              Navigator.of(context).pop();
-
-              try {
-                await ref.read(authServiceProvider).updateProfile(name: name);
-                await ref.read(authNotifierProvider.notifier).checkAuthStatus();
-                if (mounted) showSuccessSnackBar(context, '프로필이 수정되었습니다');
-              } catch (e) {
-                if (mounted) showErrorSnackBar(context, '수정 실패: $e');
-              }
+              await ref.read(authServiceProvider).updateProfile(name: name);
+              await ref.read(authNotifierProvider.notifier).checkAuthStatus();
+              if (context.mounted) Navigator.of(context).pop();
+              if (mounted) showSuccessSnackBar(context, '프로필이 수정되었습니다');
             },
           ),
         ],
@@ -261,7 +258,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildActivityCard() {
     final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final month = toMonthKey(now);
 
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
@@ -284,7 +281,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('활동 요약', style: AppTypography.heading3),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
                   Expanded(child: _buildStatItem('등록 자산', '$assetCount', LucideIcons.wallet)),
@@ -313,7 +310,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Icon(icon, size: 18, color: AppColors.gray600),
           ),
-          SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(label, style: AppTypography.bodyMedium),
           ),
@@ -344,7 +341,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           child: Icon(icon, size: 22, color: AppColors.emerald600),
         ),
-        SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           value,
           style: AppTypography.heading3.copyWith(
@@ -357,6 +354,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           style: AppTypography.caption,
         ),
       ],
+    );
+  }
+}
+
+class _SaveButton extends StatefulWidget {
+  final String label;
+  final String savingLabel;
+  final Future<void> Function() onSave;
+  const _SaveButton({required this.label, required this.savingLabel, required this.onSave});
+
+  @override
+  State<_SaveButton> createState() => _SaveButtonState();
+}
+
+class _SaveButtonState extends State<_SaveButton> {
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlButton(
+      label: _isSaving ? widget.savingLabel : widget.label,
+      onPressed: _isSaving ? null : () async {
+        setState(() => _isSaving = true);
+        try {
+          await widget.onSave();
+        } catch (e) {
+          if (mounted) showErrorSnackBar(context, '수정 실패: $e');
+        } finally {
+          if (mounted) setState(() => _isSaving = false);
+        }
+      },
     );
   }
 }

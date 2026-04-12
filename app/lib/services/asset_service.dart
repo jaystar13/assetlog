@@ -8,14 +8,14 @@ class AssetService {
   AssetService(this._dio);
 
   /// GET /assets?status=active|closed|all&month=YYYY-MM
-  Future<List<Map<String, dynamic>>> getAssets({String status = 'active', String? month}) async {
+  Future<List<Map<String, dynamic>>> getAssets({
+    String status = 'active',
+    String? month,
+  }) async {
     try {
       final response = await _dio.get(
         '/assets',
-        queryParameters: {
-          'status': status,
-          if (month != null) 'month': month,
-        },
+        queryParameters: {'status': status, 'month': ?month},
       );
       return _unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
@@ -35,7 +35,7 @@ class AssetService {
         data: {
           'categoryId': categoryId,
           'name': name,
-          if (shareGroupIds != null) 'shareGroupIds': shareGroupIds,
+          'shareGroupIds': ?shareGroupIds,
         },
       );
       return _unwrap(response);
@@ -45,7 +45,10 @@ class AssetService {
   }
 
   /// PATCH /assets/:id
-  Future<Map<String, dynamic>> updateAsset(String id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateAsset(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
     try {
       final response = await _dio.patch('/assets/$id', data: data);
       return _unwrap(response);

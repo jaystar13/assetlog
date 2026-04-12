@@ -79,8 +79,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
       }
-    } catch (_) {
-      // 사용자가 인앱 브라우저를 닫은 경우
+    } catch (e) {
+      // 사용자가 인앱 브라우저를 닫은 경우는 무시
+      final msg = e.toString();
+      final isCancelled = msg.contains('CANCELED') || msg.contains('cancel');
+      if (!isCancelled && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인에 실패했습니다. 다시 시도해 주세요.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

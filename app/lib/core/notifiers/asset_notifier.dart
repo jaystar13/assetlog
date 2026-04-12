@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/asset_item.dart';
@@ -59,15 +58,10 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
     final service = ref.read(assetServiceProvider);
     final created = await service.createAsset(categoryId: categoryId, name: name, shareGroupIds: shareGroupIds);
     final assetId = created['id'] as String;
-    developer.log('Asset created: $assetId, initialValue: $initialValue', name: 'AssetNotifier');
+    final currentMonth = arg; // family parameter = YYYY-MM
 
     if (initialValue != null && initialValue != 0) {
-      try {
-        await service.upsertHistory(assetId: assetId, month: arg, value: initialValue);
-        developer.log('History saved: $assetId/$arg = $initialValue', name: 'AssetNotifier');
-      } catch (e) {
-        developer.log('History save FAILED: $e', name: 'AssetNotifier');
-      }
+      await service.upsertHistory(assetId: assetId, month: currentMonth, value: initialValue);
     }
 
     _invalidateAll();

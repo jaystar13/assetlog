@@ -54,12 +54,15 @@ class ShareGroupService {
     String? message,
   }) async {
     try {
-      final response = await _dio.post('/share-groups/$groupId/invite', data: {
-        'toEmail': toEmail,
-        if (nickname != null) 'nickname': nickname,
-        if (color != null) 'color': color,
-        if (message != null) 'message': message,
-      });
+      final response = await _dio.post(
+        '/share-groups/$groupId/invite',
+        data: {
+          'toEmail': toEmail,
+          'nickname': ?nickname,
+          'color': ?color,
+          'message': ?message,
+        },
+      );
       return _unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -95,7 +98,9 @@ class ShareGroupService {
 
   Future<Map<String, dynamic>> acceptInvitation(String invitationId) async {
     try {
-      final response = await _dio.post('/share-groups/invitations/$invitationId/accept');
+      final response = await _dio.post(
+        '/share-groups/invitations/$invitationId/accept',
+      );
       return _unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -112,7 +117,10 @@ class ShareGroupService {
 
   // ─── 항목 공유 ─────────────────────────────────
 
-  Future<void> shareItems(String groupId, List<Map<String, dynamic>> items) async {
+  Future<void> shareItems(
+    String groupId,
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       await _dio.post('/share-groups/$groupId/items', data: {'items': items});
     } on DioException catch (e) {
@@ -120,14 +128,19 @@ class ShareGroupService {
     }
   }
 
-  Future<List<String>> getItemSharedGroups(String itemType, String itemId) async {
+  Future<List<String>> getItemSharedGroups(
+    String itemType,
+    String itemId,
+  ) async {
     try {
-      final response = await _dio.get('/share-groups/item-groups', queryParameters: {
-        'itemType': itemType,
-        'itemId': itemId,
-      });
+      final response = await _dio.get(
+        '/share-groups/item-groups',
+        queryParameters: {'itemType': itemType, 'itemId': itemId},
+      );
       final body = response.data;
-      final data = body is Map<String, dynamic> && body.containsKey('data') ? body['data'] : body;
+      final data = body is Map<String, dynamic> && body.containsKey('data')
+          ? body['data']
+          : body;
       return (data as List).cast<String>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -155,22 +168,30 @@ class ShareGroupService {
 
   // ─── 공유 데이터 조회 ──────────────────────────
 
-  Future<List<Map<String, dynamic>>> getGroupTransactions(String groupId, {String? month}) async {
+  Future<List<Map<String, dynamic>>> getGroupTransactions(
+    String groupId, {
+    String? month,
+  }) async {
     try {
-      final response = await _dio.get('/share-groups/$groupId/transactions', queryParameters: {
-        if (month != null) 'month': month,
-      });
+      final response = await _dio.get(
+        '/share-groups/$groupId/transactions',
+        queryParameters: {'month': ?month},
+      );
       return _unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  Future<List<Map<String, dynamic>>> getGroupAssets(String groupId, {String? month}) async {
+  Future<List<Map<String, dynamic>>> getGroupAssets(
+    String groupId, {
+    String? month,
+  }) async {
     try {
-      final response = await _dio.get('/share-groups/$groupId/assets', queryParameters: {
-        if (month != null) 'month': month,
-      });
+      final response = await _dio.get(
+        '/share-groups/$groupId/assets',
+        queryParameters: {'month': ?month},
+      );
       return _unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

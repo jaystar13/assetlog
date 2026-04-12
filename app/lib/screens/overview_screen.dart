@@ -10,6 +10,7 @@ import '../design_system/components/al_section_header.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/providers.dart';
+import '../utils/date_format.dart';
 import '../utils/format_korean_won.dart';
 
 class OverviewScreen extends ConsumerStatefulWidget {
@@ -28,7 +29,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     final count = _selectedPeriod == PeriodFilter.threeMonths ? 3 : 6;
     return List.generate(count, (i) {
       final d = DateTime(now.year, now.month - (count - 1 - i));
-      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+      return toMonthKey(d);
     });
   }
 
@@ -62,15 +63,15 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 children: [
                   // Net worth trend
                   _buildNetWorthTrendCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
+                  const SizedBox(height: AppSpacing.sectionGap),
 
                   // Income vs expense
                   _buildIncomeExpenseCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
+                  const SizedBox(height: AppSpacing.sectionGap),
 
                   // Asset category stacked bar
                   _buildAssetCategoryCard(),
-                  SizedBox(height: AppSpacing.sectionGap),
+                  const SizedBox(height: AppSpacing.sectionGap),
 
                   // Monthly detail table
                   _buildMonthlyDetailTable(),
@@ -92,7 +93,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         _periodButton(PeriodFilter.threeMonths),
-        SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpacing.sm),
         _periodButton(PeriodFilter.sixMonths),
       ],
     );
@@ -140,10 +141,10 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
         children: [
           AlSectionHeader(title: title),
           if (legend != null) ...[
-            SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
             legend,
           ],
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           SizedBox(height: 256, child: chart),
         ],
       ),
@@ -560,9 +561,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AlSectionHeader(title: '월별 상세 내역'),
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
                 Center(child: CircularProgressIndicator()),
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           );
@@ -576,7 +577,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AlSectionHeader(title: '월별 상세 내역'),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
               _tableRow(month: '월', income: '수입', expense: '지출', netWorth: '순자산', isHeader: true),
               Divider(color: AppColors.gray200, height: 1),
               ...months.asMap().entries.map((e) {
@@ -671,7 +672,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            SizedBox(width: AppSpacing.xs),
+            const SizedBox(width: AppSpacing.xs),
             Text(item.label, style: AppTypography.caption),
           ],
         );

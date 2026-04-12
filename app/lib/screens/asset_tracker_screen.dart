@@ -19,6 +19,7 @@ import '../core/notifiers/asset_notifier.dart';
 import '../core/providers.dart';
 import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
+import '../utils/date_format.dart';
 import '../utils/snackbar_helper.dart';
 
 class AssetTrackerScreen extends ConsumerStatefulWidget {
@@ -38,8 +39,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   List<Map<String, dynamic>> _myGroups = [];
   bool _groupsLoaded = false;
 
-  String get _monthKey =>
-      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+  String get _monthKey => toMonthKey(_selectedMonth);
 
   void _toggleGroup(String id) {
     setState(() {
@@ -82,7 +82,9 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
     // 공유 그룹 목록 가져오기
     List<Map<String, dynamic>> shareGroups = [];
-    try { shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups(); } catch (_) {}
+    try {
+      shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups();
+    } catch (_) {}
     final selectedShareGroupIds = <String>{};
     if (!mounted) return;
 
@@ -96,7 +98,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             children: [
               // 자산 그룹 선택
               Text('자산 유형', style: AppTypography.label),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -108,19 +110,25 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   child: DropdownButton<String>(
                     value: selectedGroup,
                     isExpanded: true,
-                    icon: Icon(LucideIcons.chevronDown, size: 16, color: AppColors.gray500),
+                    icon: Icon(
+                      LucideIcons.chevronDown,
+                      size: 16,
+                      color: AppColors.gray500,
+                    ),
                     style: AppTypography.bodyLarge,
                     items: groups
-                        .map((g) => DropdownMenuItem(
-                              value: g.id,
-                              child: Row(
-                                children: [
-                                  Icon(g.icon, size: 18, color: g.colors.text),
-                                  SizedBox(width: AppSpacing.sm),
-                                  Text(g.name),
-                                ],
-                              ),
-                            ))
+                        .map(
+                          (g) => DropdownMenuItem(
+                            value: g.id,
+                            child: Row(
+                              children: [
+                                Icon(g.icon, size: 18, color: g.colors.text),
+                                const SizedBox(width: AppSpacing.sm),
+                                Text(g.name),
+                              ],
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (val) {
                       if (val != null) setSheetState(() => selectedGroup = val);
@@ -128,7 +136,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   ),
                 ),
               ),
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xl),
 
               // 자산명
               AlInput(
@@ -136,7 +144,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 placeholder: '예: 서울 아파트, S&P 500 ETF 등',
                 controller: nameController,
               ),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
 
               // 현재 가치
               AlInput(
@@ -145,13 +153,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 controller: valueController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [CurrencyInputFormatter()],
-                prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
+                prefixIcon: Icon(
+                  LucideIcons.banknote,
+                  size: 16,
+                  color: AppColors.gray500,
+                ),
               ),
               // 공유 그룹 선택
               if (shareGroups.isNotEmpty) ...[
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
                 Text('공유 그룹', style: AppTypography.label),
-                SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.sm),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
@@ -161,22 +173,47 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     final sel = selectedShareGroupIds.contains(gId);
                     return GestureDetector(
                       onTap: () => setSheetState(() {
-                        if (sel) { selectedShareGroupIds.remove(gId); }
-                        else { selectedShareGroupIds.add(gId); }
+                        if (sel) {
+                          selectedShareGroupIds.remove(gId);
+                        } else {
+                          selectedShareGroupIds.add(gId);
+                        }
                       }),
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: sel ? AppColors.emerald50 : AppColors.gray50,
                           borderRadius: AppRadius.fullAll,
-                          border: Border.all(color: sel ? AppColors.emerald500 : AppColors.gray200),
+                          border: Border.all(
+                            color: sel
+                                ? AppColors.emerald500
+                                : AppColors.gray200,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(sel ? LucideIcons.checkCircle2 : LucideIcons.circle, size: 14, color: sel ? AppColors.emerald600 : AppColors.gray400),
+                            Icon(
+                              sel
+                                  ? LucideIcons.checkCircle2
+                                  : LucideIcons.circle,
+                              size: 14,
+                              color: sel
+                                  ? AppColors.emerald600
+                                  : AppColors.gray400,
+                            ),
                             SizedBox(width: 6),
-                            Text(gName, style: AppTypography.bodySmall.copyWith(color: sel ? AppColors.emerald700 : AppColors.gray600)),
+                            Text(
+                              gName,
+                              style: AppTypography.bodySmall.copyWith(
+                                color: sel
+                                    ? AppColors.emerald700
+                                    : AppColors.gray600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -184,7 +221,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   }).toList(),
                 ),
               ],
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xl),
 
               // 추가 버튼
               AlButton(
@@ -214,12 +251,16 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
                   Navigator.of(context).pop();
 
-                  final notifier = ref.read(assetNotifierProvider(_monthKey).notifier);
+                  final notifier = ref.read(
+                    assetNotifierProvider(_monthKey).notifier,
+                  );
                   await notifier.addAsset(
                     categoryId: selectedGroup,
                     name: name,
                     initialValue: actualValue,
-                    shareGroupIds: selectedShareGroupIds.isNotEmpty ? selectedShareGroupIds.toList() : null,
+                    shareGroupIds: selectedShareGroupIds.isNotEmpty
+                        ? selectedShareGroupIds.toList()
+                        : null,
                   );
 
                   _expandedGroups.add(selectedGroup);
@@ -262,7 +303,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 child: Row(
                   children: [
                     Icon(group.icon, size: 18, color: group.colors.text),
-                    SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: AppSpacing.sm),
                     Text(
                       group.name,
                       style: AppTypography.label.copyWith(
@@ -272,7 +313,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   ],
                 ),
               ),
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xl),
 
               // 자산명
               AlInput(
@@ -280,7 +321,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 placeholder: '예: 서울 아파트',
                 controller: nameController,
               ),
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
 
               // 현재 가치
               AlInput(
@@ -289,9 +330,13 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                 controller: valueController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [CurrencyInputFormatter()],
-                prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
+                prefixIcon: Icon(
+                  LucideIcons.banknote,
+                  size: 16,
+                  color: AppColors.gray500,
+                ),
               ),
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xl),
 
               // 수정 버튼
               AlButton(
@@ -317,16 +362,20 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   }
 
                   final isDebt = group.id == 'loans';
-                  final actualValue = isDebt ? -value.abs().toInt() : value.toInt();
+                  final actualValue = isDebt
+                      ? -value.abs().toInt()
+                      : value.toInt();
 
                   Navigator.of(context).pop();
 
                   final month = _monthKey;
-                  await ref.read(assetNotifierProvider(_monthKey).notifier).updateAssetValue(
-                    assetId: item.id,
-                    month: month,
-                    value: actualValue,
-                  );
+                  await ref
+                      .read(assetNotifierProvider(_monthKey).notifier)
+                      .updateAssetValue(
+                        assetId: item.id,
+                        month: month,
+                        value: actualValue,
+                      );
 
                   if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
                 },
@@ -368,19 +417,32 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   AlConfirmDialog.show(
                     context: context,
                     title: '자산 종료',
-                    message: "'${item.name}'을(를) 종료하시겠습니까?\n히스토리는 보존되며, 목록에서 숨겨집니다.",
+                    message:
+                        "'${item.name}'을(를) 종료하시겠습니까?\n히스토리는 보존되며, 목록에서 숨겨집니다.",
                     confirmLabel: '종료',
                     isDestructive: false,
                     onConfirm: () async {
-                      await ref.read(assetNotifierProvider(_monthKey).notifier).closeAsset(item.id);
-                      if (mounted) showSuccessSnackBar(context, "'${item.name}'이(가) 종료되었습니다");
+                      await ref
+                          .read(assetNotifierProvider(_monthKey).notifier)
+                          .closeAsset(item.id);
+                      if (mounted) {
+                        showSuccessSnackBar(
+                          context,
+                          "'${item.name}'이(가) 종료되었습니다",
+                        );
+                      }
                     },
                   );
                 },
               ),
               ListTile(
                 leading: Icon(LucideIcons.trash2, color: AppColors.red600),
-                title: Text('자산 삭제', style: AppTypography.bodyLarge.copyWith(color: AppColors.red600)),
+                title: Text(
+                  '자산 삭제',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.red600,
+                  ),
+                ),
                 subtitle: Text(
                   '자산과 모든 히스토리를 완전히 삭제합니다',
                   style: AppTypography.caption,
@@ -390,10 +452,18 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                   AlConfirmDialog.show(
                     context: context,
                     title: '자산 삭제',
-                    message: "'${item.name}'과(와) 모든 히스토리를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                    message:
+                        "'${item.name}'과(와) 모든 히스토리를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
                     onConfirm: () async {
-                      await ref.read(assetNotifierProvider(_monthKey).notifier).deleteAsset(item.id);
-                      if (mounted) showSuccessSnackBar(context, "'${item.name}'이(가) 삭제되었습니다");
+                      await ref
+                          .read(assetNotifierProvider(_monthKey).notifier)
+                          .deleteAsset(item.id);
+                      if (mounted) {
+                        showSuccessSnackBar(
+                          context,
+                          "'${item.name}'이(가) 삭제되었습니다",
+                        );
+                      }
                     },
                   );
                 },
@@ -437,25 +507,27 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.sm),
                       AlInput(
                         placeholder: '새 금액을 입력하세요',
                         controller: controllers[item.id],
                         keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters: [CurrencyInputFormatter()],
                       ),
                     ],
                   ),
                 );
               }),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               AlButton(
                 label: '업데이트',
                 onPressed: () async {
                   Navigator.of(context).pop();
 
                   final month = _monthKey;
-                  final notifier = ref.read(assetNotifierProvider(_monthKey).notifier);
+                  final notifier = ref.read(
+                    assetNotifierProvider(_monthKey).notifier,
+                  );
                   final isDebt = group.id == 'loans';
 
                   for (final item in group.items) {
@@ -495,28 +567,62 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   void _showGroupSelector() {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(LucideIcons.user, color: _selectedGroupId == null ? AppColors.emerald600 : AppColors.gray500),
+              leading: Icon(
+                LucideIcons.user,
+                color: _selectedGroupId == null
+                    ? AppColors.emerald600
+                    : AppColors.gray500,
+              ),
               title: Text('나', style: AppTypography.bodyLarge),
-              trailing: _selectedGroupId == null ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
-              onTap: () { setState(() { _selectedGroupId = null; _selectedGroupName = '나'; }); Navigator.pop(ctx); },
+              trailing: _selectedGroupId == null
+                  ? Icon(
+                      LucideIcons.check,
+                      size: 18,
+                      color: AppColors.emerald600,
+                    )
+                  : null,
+              onTap: () {
+                setState(() {
+                  _selectedGroupId = null;
+                  _selectedGroupName = '나';
+                });
+                Navigator.pop(ctx);
+              },
             ),
             ..._myGroups.map((g) {
               final gId = g['id'] as String;
               final gName = g['name'] as String;
               final memberCount = (g['members'] as List?)?.length ?? 0;
-              final displayName = '$gName(${memberCount}명)';
+              final displayName = '$gName($memberCount명)';
               final sel = _selectedGroupId == gId;
               return ListTile(
-                leading: Icon(LucideIcons.users, color: sel ? AppColors.emerald600 : AppColors.gray500),
+                leading: Icon(
+                  LucideIcons.users,
+                  color: sel ? AppColors.emerald600 : AppColors.gray500,
+                ),
                 title: Text(displayName, style: AppTypography.bodyLarge),
-                trailing: sel ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
-                onTap: () { setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; }); Navigator.pop(ctx); },
+                trailing: sel
+                    ? Icon(
+                        LucideIcons.check,
+                        size: 18,
+                        color: AppColors.emerald600,
+                      )
+                    : null,
+                onTap: () {
+                  setState(() {
+                    _selectedGroupId = gId;
+                    _selectedGroupName = displayName;
+                  });
+                  Navigator.pop(ctx);
+                },
               );
             }),
           ],
@@ -536,29 +642,55 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           AlScreenHeader(
             title: '자산 현황',
             subtitle: '나의 자산을 카테고리별로 관리하세요',
-            action: _myGroups.isNotEmpty ? GestureDetector(
-              onTap: _showGroupSelector,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _isGroupMode ? AppColors.emerald50 : AppColors.gray50,
-                  borderRadius: AppRadius.fullAll,
-                  border: Border.all(color: _isGroupMode ? AppColors.emerald500 : AppColors.gray200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_isGroupMode ? LucideIcons.users : LucideIcons.user, size: 14,
-                        color: _isGroupMode ? AppColors.emerald600 : AppColors.gray600),
-                    SizedBox(width: 6),
-                    Text(_selectedGroupName, style: AppTypography.bodySmall.copyWith(
-                        color: _isGroupMode ? AppColors.emerald700 : AppColors.gray600)),
-                    SizedBox(width: 4),
-                    Icon(LucideIcons.chevronDown, size: 12, color: AppColors.gray400),
-                  ],
-                ),
-              ),
-            ) : null,
+            action: _myGroups.isNotEmpty
+                ? GestureDetector(
+                    onTap: _showGroupSelector,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isGroupMode
+                            ? AppColors.emerald50
+                            : AppColors.gray50,
+                        borderRadius: AppRadius.fullAll,
+                        border: Border.all(
+                          color: _isGroupMode
+                              ? AppColors.emerald500
+                              : AppColors.gray200,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isGroupMode ? LucideIcons.users : LucideIcons.user,
+                            size: 14,
+                            color: _isGroupMode
+                                ? AppColors.emerald600
+                                : AppColors.gray600,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            _selectedGroupName,
+                            style: AppTypography.bodySmall.copyWith(
+                              color: _isGroupMode
+                                  ? AppColors.emerald700
+                                  : AppColors.gray600,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            LucideIcons.chevronDown,
+                            size: 12,
+                            color: AppColors.gray400,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : null,
           ),
 
           AlMonthSelector(
@@ -567,9 +699,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             onNext: _goToNextMonth,
           ),
 
-          Expanded(
-            child: _buildAssetContent(),
-          ),
+          Expanded(child: _buildAssetContent()),
         ],
       ),
     );
@@ -587,8 +717,15 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
       return;
     }
     try {
-      final assets = await ref.read(shareGroupServiceProvider).getGroupAssets(_selectedGroupId!, month: _monthKey);
-      if (mounted) setState(() { _sharedAssets = assets; _lastAssetGroupKey = key; });
+      final assets = await ref
+          .read(shareGroupServiceProvider)
+          .getGroupAssets(_selectedGroupId!, month: _monthKey);
+      if (mounted) {
+        setState(() {
+          _sharedAssets = assets;
+          _lastAssetGroupKey = key;
+        });
+      }
     } catch (_) {}
   }
 
@@ -599,49 +736,76 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
       _sharedAssets = [];
       _lastAssetGroupKey = null;
     }
-    return ref.watch(assetNotifierProvider(_monthKey)).when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
-      data: (groups) => SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: AppSpacing.screenPadding,
-          right: AppSpacing.screenPadding,
-          bottom: AppSpacing.bottomNavSafeArea,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: AppSpacing.lg),
-            _buildPieChartCard(groups),
-            SizedBox(height: AppSpacing.sectionGap),
-            ...groups.map((group) {
-              // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
-              final sharedInCategory = _isGroupMode
-                  ? _sharedAssets.where((a) => a['categoryId'] == group.id).toList()
-                  : <Map<String, dynamic>>[];
-              return Padding(
-                key: ValueKey(group.id),
-                padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                child: _buildAssetGroupCard(group, sharedAssets: sharedInCategory),
-              );
-            }),
-            SizedBox(height: AppSpacing.lg),
-            _buildAddAssetButton(),
-            SizedBox(height: AppSpacing.sectionGap),
-          ],
-        ),
-      ),
-    );
+    return ref
+        .watch(assetNotifierProvider(_monthKey))
+        .when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '데이터를 불러올 수 없습니다',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.gray500,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () =>
+                      ref.invalidate(assetNotifierProvider(_monthKey)),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('다시 시도'),
+                ),
+              ],
+            ),
+          ),
+          data: (groups) => SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: AppSpacing.screenPadding,
+              right: AppSpacing.screenPadding,
+              bottom: AppSpacing.bottomNavSafeArea,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: AppSpacing.lg),
+                _buildPieChartCard(groups),
+                const SizedBox(height: AppSpacing.sectionGap),
+                ...groups.map((group) {
+                  // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
+                  final sharedInCategory = _isGroupMode
+                      ? _sharedAssets
+                            .where((a) => a['categoryId'] == group.id)
+                            .toList()
+                      : <Map<String, dynamic>>[];
+                  return Padding(
+                    key: ValueKey(group.id),
+                    padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                    child: _buildAssetGroupCard(
+                      group,
+                      sharedAssets: sharedInCategory,
+                    ),
+                  );
+                }),
+                const SizedBox(height: AppSpacing.lg),
+                _buildAddAssetButton(),
+                const SizedBox(height: AppSpacing.sectionGap),
+              ],
+            ),
+          ),
+        );
   }
 
   // ─── Pie Chart Card ──────────────────────────────────────────────────
 
   Widget _buildPieChartCard(List<AssetGroup> groups) {
     // Only include positive-value groups for the composition chart
-    final positiveGroups =
-        groups.where((g) => g.totalValue > 0).toList();
-    final totalPositive =
-        positiveGroups.fold<num>(0, (sum, g) => sum + g.totalValue);
+    final positiveGroups = groups.where((g) => g.totalValue > 0).toList();
+    final totalPositive = positiveGroups.fold<num>(
+      0,
+      (sum, g) => sum + g.totalValue,
+    );
 
     return AlCard(
       child: Column(
@@ -661,7 +825,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.xl),
           SizedBox(
             height: 200,
             child: Row(
@@ -684,7 +848,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                     ),
                   ),
                 ),
-                SizedBox(width: AppSpacing.xl),
+                const SizedBox(width: AppSpacing.xl),
                 // Legend
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -706,14 +870,14 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                          SizedBox(width: AppSpacing.sm),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(
                             group.name,
                             style: AppTypography.bodySmall.copyWith(
                               color: AppColors.gray700,
                             ),
                           ),
-                          SizedBox(width: AppSpacing.sm),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(
                             '${percent.toStringAsFixed(1)}%',
                             style: AppTypography.labelSmall.copyWith(
@@ -735,7 +899,10 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
   // ─── Asset Group Card ────────────────────────────────────────────────
 
-  Widget _buildAssetGroupCard(AssetGroup group, {List<Map<String, dynamic>> sharedAssets = const []}) {
+  Widget _buildAssetGroupCard(
+    AssetGroup group, {
+    List<Map<String, dynamic>> sharedAssets = const [],
+  }) {
     final isExpanded = _expandedGroups.contains(group.id);
     final categoryColors = group.colors;
 
@@ -770,7 +937,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                       color: categoryColors.text,
                     ),
                   ),
-                  SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.md),
                   // Name and item count
                   Expanded(
                     child: Column(
@@ -778,13 +945,23 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                       children: [
                         Text(group.name, style: AppTypography.label),
                         SizedBox(height: 2),
-                        Row(children: [
-                          Text('${group.items.length}개', style: AppTypography.bodySmall),
-                          if (sharedAssets.isNotEmpty) ...[
-                            SizedBox(width: AppSpacing.xs),
-                            Text('· 공유 ${sharedAssets.length}개', style: AppTypography.bodySmall.copyWith(color: AppColors.teal500)),
+                        Row(
+                          children: [
+                            Text(
+                              '${group.items.length}개',
+                              style: AppTypography.bodySmall,
+                            ),
+                            if (sharedAssets.isNotEmpty) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                '· 공유 ${sharedAssets.length}개',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.teal500,
+                                ),
+                              ),
+                            ],
                           ],
-                        ]),
+                        ),
                       ],
                     ),
                   ),
@@ -807,7 +984,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                         Text('전월 동일', style: AppTypography.bodySmall),
                     ],
                   ),
-                  SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.sm),
                   // Expand/collapse chevron
                   AnimatedRotation(
                     turns: isExpanded ? 0.5 : 0,
@@ -825,7 +1002,10 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           // Expanded content
           AnimatedCrossFade(
             firstChild: SizedBox.shrink(),
-            secondChild: _buildExpandedContent(group, sharedAssets: sharedAssets),
+            secondChild: _buildExpandedContent(
+              group,
+              sharedAssets: sharedAssets,
+            ),
             crossFadeState: isExpanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
@@ -839,18 +1019,31 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   // 멤버 색상/별명 매핑 (공유 자산 표시용)
   Color _getMemberColor(String? hex) {
     if (hex == null) return AppColors.teal500;
-    try { return Color(int.parse('FF${hex.substring(1)}', radix: 16)); } catch (_) { return AppColors.teal500; }
+    try {
+      return Color(int.parse('FF${hex.substring(1)}', radix: 16));
+    } catch (_) {
+      return AppColors.teal500;
+    }
   }
 
-  Widget _buildExpandedContent(AssetGroup group, {List<Map<String, dynamic>> sharedAssets = const []}) {
+  Widget _buildExpandedContent(
+    AssetGroup group, {
+    List<Map<String, dynamic>> sharedAssets = const [],
+  }) {
     // 멤버 정보 캐시 (그룹 선택 시 _myGroups에서 가져옴)
-    final currentGroup = _myGroups.where((g) => g['id'] == _selectedGroupId).firstOrNull;
-    final members = (currentGroup?['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final currentGroup = _myGroups
+        .where((g) => g['id'] == _selectedGroupId)
+        .firstOrNull;
+    final members =
+        (currentGroup?['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final memberNicknames = <String, String>{};
     final memberColors = <String, String?>{};
     for (final m in members) {
       final uid = (m['user'] as Map?)?['id'] as String? ?? '';
-      memberNicknames[uid] = m['nickname'] as String? ?? (m['user'] as Map?)?['name'] as String? ?? '';
+      memberNicknames[uid] =
+          m['nickname'] as String? ??
+          (m['user'] as Map?)?['name'] as String? ??
+          '';
       memberColors[uid] = m['color'] as String?;
     }
 
@@ -868,30 +1061,69 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
         ...sharedAssets.map((raw) {
           final name = raw['name'] as String? ?? '';
           final history = raw['valueHistory'] as List<dynamic>? ?? [];
-          final value = history.isNotEmpty ? (history.first['value'] as num).toInt() : 0;
-          final ownerId = raw['userId'] as String? ?? raw['user_id'] as String? ?? '';
-          final ownerName = memberNicknames[ownerId] ?? (raw['user'] as Map?)?['name'] as String? ?? '';
+          final value = history.isNotEmpty
+              ? (history.first['value'] as num).toInt()
+              : 0;
+          final ownerId =
+              raw['userId'] as String? ?? raw['user_id'] as String? ?? '';
+          final ownerName =
+              memberNicknames[ownerId] ??
+              (raw['user'] as Map?)?['name'] as String? ??
+              '';
           final ownerColor = _getMemberColor(memberColors[ownerId]);
 
           return Container(
-            decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.04)),
-            padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
+            decoration: BoxDecoration(
+              color: ownerColor.withValues(alpha: 0.04),
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.cardPadding,
+              vertical: AppSpacing.md,
+            ),
             child: Row(
               children: [
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 1),
-                    SizedBox(height: 2),
-                    Row(children: [
-                      Flexible(child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
-                        child: Text(ownerName, style: AppTypography.caption.copyWith(color: ownerColor, fontSize: 10, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
-                      )),
-                    ]),
-                  ],
-                )),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: AppTypography.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: ownerColor.withValues(alpha: 0.1),
+                                borderRadius: AppRadius.fullAll,
+                              ),
+                              child: Text(
+                                ownerName,
+                                style: AppTypography.caption.copyWith(
+                                  color: ownerColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 Text(formatKoreanWon(value), style: AppTypography.amountSmall),
               ],
             ),
@@ -908,7 +1140,11 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           child: AlButton(
             label: '이번 달 업데이트',
             variant: AlButtonVariant.secondary,
-            icon: Icon(LucideIcons.refreshCw, size: 16, color: AppColors.gray700),
+            icon: Icon(
+              LucideIcons.refreshCw,
+              size: 16,
+              color: AppColors.gray700,
+            ),
             onPressed: () => _showUpdateSheet(group),
           ),
         ),
@@ -921,56 +1157,59 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
       onTap: () => _showEditAssetSheet(item, group),
       onLongPress: () => _showAssetActionSheet(item, group),
       child: Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.cardPadding,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.gray900,
-                )),
-                SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      '${item.lastUpdated} 업데이트',
-                      style: AppTypography.caption,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.cardPadding,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.gray900,
                     ),
-                    if (item.editedBy != null) ...[
-                      SizedBox(width: AppSpacing.sm),
-                      _buildEditorBadge(item.editedBy!),
+                  ),
+                  SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        '${item.lastUpdated} 업데이트',
+                        style: AppTypography.caption,
+                      ),
+                      if (item.editedBy != null) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        _buildEditorBadge(item.editedBy!),
+                      ],
                     ],
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            // Value and change
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  formatKoreanWon(item.currentValue),
+                  style: AppTypography.label,
                 ),
+                SizedBox(height: 2),
+                if (item.changePercent != 0)
+                  AlChangeIndicator.percent(
+                    percent: item.changePercent,
+                    iconSize: 12,
+                    fontSize: 11,
+                  )
+                else
+                  Text('전월 동일', style: AppTypography.caption),
               ],
             ),
-          ),
-          // Value and change
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                formatKoreanWon(item.currentValue),
-                style: AppTypography.label,
-              ),
-              SizedBox(height: 2),
-              if (item.changePercent != 0)
-                AlChangeIndicator.percent(
-                  percent: item.changePercent,
-                  iconSize: 12,
-                  fontSize: 11,
-                )
-              else
-                Text('전월 동일', style: AppTypography.caption),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1017,7 +1256,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
         child: Column(
           children: [
             Icon(LucideIcons.plus, size: 24, color: AppColors.gray400),
-            SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               '새 자산 추가',
               style: AppTypography.label.copyWith(color: AppColors.gray500),

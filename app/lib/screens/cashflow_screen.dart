@@ -19,6 +19,7 @@ import '../core/providers.dart';
 import '../repositories/repositories.dart';
 import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
+import '../utils/date_format.dart';
 import '../utils/snackbar_helper.dart';
 
 class CashFlowScreen extends ConsumerStatefulWidget {
@@ -88,7 +89,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       title: '일괄 삭제',
       message: '선택한 $count건의 거래를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
       onConfirm: () async {
-        final notifier = ref.read(transactionNotifierProvider(_monthKey).notifier);
+        final notifier = ref.read(
+          transactionNotifierProvider(_monthKey).notifier,
+        );
         for (final id in _selectedIds) {
           await notifier.deleteTransaction(id);
         }
@@ -103,13 +106,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  String get _monthKey =>
-      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+  String get _monthKey => toMonthKey(_selectedMonth);
 
   List<Transaction> _filterTransactions(List<Transaction> transactions) =>
       _txFilter == null
-          ? transactions
-          : transactions.where((t) => t.type == _txFilter).toList();
+      ? transactions
+      : transactions.where((t) => t.type == _txFilter).toList();
 
   int _totalIncome(List<Transaction> txs) => txs
       .where((t) => t.type == TransactionType.income)
@@ -121,19 +123,13 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
   void _goToPreviousMonth() {
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month - 1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
     });
   }
 
   void _goToNextMonth() {
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     });
   }
 
@@ -154,16 +150,18 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         onSubmit: (entry) async {
           Navigator.of(context).pop();
           final shareGroupIds = (entry['shareGroupIds'] as List<String>?) ?? [];
-          await ref.read(transactionNotifierProvider(_monthKey).notifier).addTransaction(
-            type: entry['type'] as String,
-            name: entry['name'] as String,
-            amount: entry['amount'] as int,
-            date: entry['date'] as String,
-            category: entry['category'] as String,
-            subCategory: entry['subCategory'] as String,
-            paymentMethod: entry['paymentMethod'] as String?,
-            shareGroupIds: shareGroupIds.isNotEmpty ? shareGroupIds : null,
-          );
+          await ref
+              .read(transactionNotifierProvider(_monthKey).notifier)
+              .addTransaction(
+                type: entry['type'] as String,
+                name: entry['name'] as String,
+                amount: entry['amount'] as int,
+                date: entry['date'] as String,
+                category: entry['category'] as String,
+                subCategory: entry['subCategory'] as String,
+                paymentMethod: entry['paymentMethod'] as String?,
+                shareGroupIds: shareGroupIds.isNotEmpty ? shareGroupIds : null,
+              );
           if (mounted) showSuccessSnackBar(context, '거래가 추가되었습니다');
         },
       ),
@@ -189,22 +187,36 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         initialShareGroupIds: currentGroupIds,
         onSubmit: (updated) async {
           Navigator.of(context).pop();
-          const allowedFields = {'type', 'name', 'amount', 'date', 'category', 'subCategory', 'paymentMethod', 'targetMonth', 'isInstallment', 'installmentMonths', 'installmentRound'};
+          const allowedFields = {
+            'type',
+            'name',
+            'amount',
+            'date',
+            'category',
+            'subCategory',
+            'paymentMethod',
+            'targetMonth',
+            'isInstallment',
+            'installmentMonths',
+            'installmentRound',
+          };
           final payload = Map<String, dynamic>.fromEntries(
             updated.entries.where((e) => allowedFields.contains(e.key)),
           );
-          await ref.read(transactionNotifierProvider(_monthKey).notifier).updateTransaction(
-            tx.id,
-            payload,
-          );
+          await ref
+              .read(transactionNotifierProvider(_monthKey).notifier)
+              .updateTransaction(tx.id, payload);
 
           // 공유 그룹 변경
-          final shareGroupIds = (updated['shareGroupIds'] as List<String>?) ?? [];
+          final shareGroupIds =
+              (updated['shareGroupIds'] as List<String>?) ?? [];
           if (shareGroupIds.isNotEmpty) {
             try {
               await ref.read(shareGroupServiceProvider).shareItems(
                 shareGroupIds.first,
-                [{'itemType': 'transaction', 'itemId': tx.id}],
+                [
+                  {'itemType': 'transaction', 'itemId': tx.id},
+                ],
               );
             } catch (_) {}
           }
@@ -214,8 +226,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       ),
     );
   }
-
-
 
   Future<void> _loadGroups() async {
     if (_groupsLoaded) return;
@@ -231,17 +241,35 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   void _showGroupSelector() {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(LucideIcons.user, color: _selectedGroupId == null ? AppColors.emerald600 : AppColors.gray500),
+              leading: Icon(
+                LucideIcons.user,
+                color: _selectedGroupId == null
+                    ? AppColors.emerald600
+                    : AppColors.gray500,
+              ),
               title: Text('나', style: AppTypography.bodyLarge),
-              trailing: _selectedGroupId == null ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
+              trailing: _selectedGroupId == null
+                  ? Icon(
+                      LucideIcons.check,
+                      size: 18,
+                      color: AppColors.emerald600,
+                    )
+                  : null,
               onTap: () {
-                setState(() { _selectedGroupId = null; _selectedGroupName = '나'; _sharedTransactions = []; _lastLoadedGroupKey = null; });
+                setState(() {
+                  _selectedGroupId = null;
+                  _selectedGroupName = '나';
+                  _sharedTransactions = [];
+                  _lastLoadedGroupKey = null;
+                });
                 Navigator.pop(ctx);
               },
             ),
@@ -249,14 +277,27 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               final gId = g['id'] as String;
               final gName = g['name'] as String;
               final memberCount = (g['members'] as List?)?.length ?? 0;
-              final displayName = '$gName(${memberCount}명)';
+              final displayName = '$gName($memberCount명)';
               final isSelected = _selectedGroupId == gId;
               return ListTile(
-                leading: Icon(LucideIcons.users, color: isSelected ? AppColors.emerald600 : AppColors.gray500),
+                leading: Icon(
+                  LucideIcons.users,
+                  color: isSelected ? AppColors.emerald600 : AppColors.gray500,
+                ),
                 title: Text(displayName, style: AppTypography.bodyLarge),
-                trailing: isSelected ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
+                trailing: isSelected
+                    ? Icon(
+                        LucideIcons.check,
+                        size: 18,
+                        color: AppColors.emerald600,
+                      )
+                    : null,
                 onTap: () {
-                  setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; _lastLoadedGroupKey = null; });
+                  setState(() {
+                    _selectedGroupId = gId;
+                    _selectedGroupName = displayName;
+                    _lastLoadedGroupKey = null;
+                  });
                   Navigator.pop(ctx);
                   _loadSharedTransactions();
                 },
@@ -279,29 +320,55 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           AlScreenHeader(
             title: '수입/지출 관리',
             subtitle: '매월 수입과 지출을 관리하세요',
-            action: _myGroups.isNotEmpty ? GestureDetector(
-              onTap: _showGroupSelector,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _isGroupMode ? AppColors.emerald50 : AppColors.gray50,
-                  borderRadius: AppRadius.fullAll,
-                  border: Border.all(color: _isGroupMode ? AppColors.emerald500 : AppColors.gray200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_isGroupMode ? LucideIcons.users : LucideIcons.user, size: 14,
-                        color: _isGroupMode ? AppColors.emerald600 : AppColors.gray600),
-                    SizedBox(width: 6),
-                    Text(_selectedGroupName, style: AppTypography.bodySmall.copyWith(
-                        color: _isGroupMode ? AppColors.emerald700 : AppColors.gray600)),
-                    SizedBox(width: 4),
-                    Icon(LucideIcons.chevronDown, size: 12, color: AppColors.gray400),
-                  ],
-                ),
-              ),
-            ) : null,
+            action: _myGroups.isNotEmpty
+                ? GestureDetector(
+                    onTap: _showGroupSelector,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isGroupMode
+                            ? AppColors.emerald50
+                            : AppColors.gray50,
+                        borderRadius: AppRadius.fullAll,
+                        border: Border.all(
+                          color: _isGroupMode
+                              ? AppColors.emerald500
+                              : AppColors.gray200,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isGroupMode ? LucideIcons.users : LucideIcons.user,
+                            size: 14,
+                            color: _isGroupMode
+                                ? AppColors.emerald600
+                                : AppColors.gray600,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            _selectedGroupName,
+                            style: AppTypography.bodySmall.copyWith(
+                              color: _isGroupMode
+                                  ? AppColors.emerald700
+                                  : AppColors.gray600,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            LucideIcons.chevronDown,
+                            size: 12,
+                            color: AppColors.gray400,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : null,
           ),
 
           // Month selector
@@ -312,11 +379,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           ),
 
           // Scrollable content
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
-        ),
+      ),
     );
   }
 
@@ -333,119 +398,174 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       return;
     }
     try {
-      final txs = await ref.read(shareGroupServiceProvider).getGroupTransactions(_selectedGroupId!, month: _monthKey);
-      if (mounted) setState(() { _sharedTransactions = txs; _lastLoadedGroupKey = key; });
+      final txs = await ref
+          .read(shareGroupServiceProvider)
+          .getGroupTransactions(_selectedGroupId!, month: _monthKey);
+      if (mounted) {
+        setState(() {
+          _sharedTransactions = txs;
+          _lastLoadedGroupKey = key;
+        });
+      }
     } catch (_) {}
   }
 
   Widget _buildContent() {
     if (_isGroupMode) _loadSharedTransactions();
 
-    return ref.watch(transactionNotifierProvider(_monthKey)).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500))),
-              data: (transactions) {
-                final filtered = _filterTransactions(transactions);
-                // 월간 요약은 내 데이터만
-                final income = _totalIncome(transactions);
-                final expense = _totalExpense(transactions);
-                final balance = income - expense;
-                final expenseRatio = income > 0 ? expense / income : 0.0;
-
-                return SingleChildScrollView(
-                  padding: EdgeInsets.only(
-                    left: AppSpacing.screenPadding,
-                    right: AppSpacing.screenPadding,
-                    bottom: AppSpacing.bottomNavSafeArea,
+    return ref
+        .watch(transactionNotifierProvider(_monthKey))
+        .when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '데이터를 불러올 수 없습니다',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.gray500,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () =>
+                      ref.invalidate(transactionNotifierProvider(_monthKey)),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('다시 시도'),
+                ),
+              ],
+            ),
+          ),
+          data: (transactions) {
+            final filtered = _filterTransactions(transactions);
+            // 월간 요약은 내 데이터만
+            final income = _totalIncome(transactions);
+            final expense = _totalExpense(transactions);
+            final balance = income - expense;
+            final expenseRatio = income > 0 ? expense / income : 0.0;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: AppSpacing.screenPadding,
+                right: AppSpacing.screenPadding,
+                bottom: AppSpacing.bottomNavSafeArea,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildMonthlySummaryCard(
+                    income: income,
+                    expense: expense,
+                    balance: balance,
+                    expenseRatio: expenseRatio,
+                    transactions: transactions,
+                  ),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  _buildSmartImportCard(),
+                  const SizedBox(height: AppSpacing.lg),
+                  AlButton(
+                    label: '수기 입력',
+                    onPressed: _showManualEntrySheet,
+                    icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
+                  ),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SizedBox(height: AppSpacing.lg),
-                      _buildMonthlySummaryCard(income: income, expense: expense, balance: balance, expenseRatio: expenseRatio, transactions: transactions),
-                      SizedBox(height: AppSpacing.sectionGap),
-                      _buildSmartImportCard(),
-                      SizedBox(height: AppSpacing.lg),
-                      AlButton(
-                        label: '수기 입력',
-                        onPressed: _showManualEntrySheet,
-                        icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
-                      ),
-                      SizedBox(height: AppSpacing.sectionGap),
+                      Text('거래 내역', style: AppTypography.heading3),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('거래 내역', style: AppTypography.heading3),
-                          Row(
-                            children: [
-                              if (_isSelectMode && filtered.isNotEmpty) ...[
-                                GestureDetector(
-                                  onTap: () => _selectAll(filtered),
-                                  child: Text(
-                                    _selectedIds.length == filtered.length ? '전체 해제' : '전체 선택',
-                                    style: AppTypography.bodySmall.copyWith(color: AppColors.emerald600),
-                                  ),
+                          if (_isSelectMode && filtered.isNotEmpty) ...[
+                            GestureDetector(
+                              onTap: () => _selectAll(filtered),
+                              child: Text(
+                                _selectedIds.length == filtered.length
+                                    ? '전체 해제'
+                                    : '전체 선택',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.emerald600,
                                 ),
-                                SizedBox(width: AppSpacing.md),
-                              ],
-                              if (filtered.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () => _toggleSelectMode(allGroupKeys: _getGroupKeys(filtered)),
-                                  child: Text(
-                                    _isSelectMode ? '취소' : '선택',
-                                    style: AppTypography.bodySmall.copyWith(
-                                      color: _isSelectMode ? AppColors.gray500 : AppColors.emerald600,
-                                    ),
-                                  ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                          ],
+                          if (filtered.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => _toggleSelectMode(
+                                allGroupKeys: _getGroupKeys(filtered),
+                              ),
+                              child: Text(
+                                _isSelectMode ? '취소' : '선택',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: _isSelectMode
+                                      ? AppColors.gray500
+                                      : AppColors.emerald600,
                                 ),
-                              if (!_isSelectMode) ...[
-                                SizedBox(width: AppSpacing.md),
-                                _buildTxFilterSegment(),
-                              ],
-                            ],
-                          ),
+                              ),
+                            ),
+                          if (!_isSelectMode) ...[
+                            const SizedBox(width: AppSpacing.md),
+                            _buildTxFilterSegment(),
+                          ],
                         ],
                       ),
-                      SizedBox(height: AppSpacing.md),
-                      if (filtered.isEmpty && !(_isGroupMode && _sharedTransactions.isNotEmpty))
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(LucideIcons.inbox, size: 48, color: AppColors.gray300),
-                                SizedBox(height: AppSpacing.md),
-                                Text(
-                                  '거래 내역이 없습니다',
-                                  style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500),
-                                ),
-                                SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  '수기 입력 또는 명세서 가져오기로 추가해 보세요',
-                                  style: AppTypography.caption.copyWith(color: AppColors.gray400),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        ..._buildGroupedTransactions(filtered),
-                      // 선택 모드 삭제 바
-                      if (_isSelectMode && _selectedIds.isNotEmpty)
-                        Padding(
-                          padding: EdgeInsets.only(top: AppSpacing.lg),
-                          child: AlButton(
-                            label: '${_selectedIds.length}건 삭제',
-                            variant: AlButtonVariant.danger,
-                            icon: Icon(LucideIcons.trash2, size: 18, color: Colors.white),
-                            onPressed: _deleteSelected,
-                          ),
-                        ),
                     ],
                   ),
-                );
-              },
+                  const SizedBox(height: AppSpacing.md),
+                  if (filtered.isEmpty &&
+                      !(_isGroupMode && _sharedTransactions.isNotEmpty))
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(
+                              LucideIcons.inbox,
+                              size: 48,
+                              color: AppColors.gray300,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              '거래 내역이 없습니다',
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.gray500,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '수기 입력 또는 명세서 가져오기로 추가해 보세요',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.gray400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._buildGroupedTransactions(filtered),
+                  // 선택 모드 삭제 바
+                  if (_isSelectMode && _selectedIds.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.lg),
+                      child: AlButton(
+                        label: '${_selectedIds.length}건 삭제',
+                        variant: AlButtonVariant.danger,
+                        icon: Icon(
+                          LucideIcons.trash2,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        onPressed: _deleteSelected,
+                      ),
+                    ),
+                ],
+              ),
             );
+          },
+        );
   }
 
   Widget _buildTxFilterSegment() {
@@ -497,20 +617,30 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     required List<Transaction> transactions,
   }) {
     // 카드 사용 내역 집계
-    final cardTxs = transactions.where(
-      (t) => t.type == TransactionType.expense && t.paymentMethod != null && t.paymentMethod!.contains('카드'),
-    ).toList();
+    final cardTxs = transactions
+        .where(
+          (t) =>
+              t.type == TransactionType.expense &&
+              t.paymentMethod != null &&
+              t.paymentMethod!.contains('카드'),
+        )
+        .toList();
     final Map<String, int> byCard = {};
     for (final tx in cardTxs) {
       byCard[tx.paymentMethod!] = (byCard[tx.paymentMethod!] ?? 0) + tx.amount;
     }
-    final sortedCards = byCard.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sortedCards = byCard.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final cardTotal = sortedCards.fold<int>(0, (sum, e) => sum + e.value);
     final hasCardData = sortedCards.isNotEmpty;
 
     final cardColors = [
-      AppColors.blue600, AppColors.emerald500, AppColors.purple600,
-      Color(0xFFF59E0B), AppColors.teal500, AppColors.red600,
+      AppColors.blue600,
+      AppColors.emerald500,
+      AppColors.purple600,
+      Color(0xFFF59E0B),
+      AppColors.teal500,
+      AppColors.red600,
     ];
 
     return AlCard(
@@ -518,7 +648,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('월간 요약', style: AppTypography.heading3),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
 
           Row(
             children: [
@@ -527,10 +657,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('수입', style: AppTypography.bodySmall),
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(income),
-                      style: AppTypography.amountMedium.copyWith(color: AppColors.green600),
+                      style: AppTypography.amountMedium.copyWith(
+                        color: AppColors.green600,
+                      ),
                     ),
                   ],
                 ),
@@ -540,17 +672,19 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('지출', style: AppTypography.bodySmall),
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(expense),
-                      style: AppTypography.amountMedium.copyWith(color: AppColors.red600),
+                      style: AppTypography.amountMedium.copyWith(
+                        color: AppColors.red600,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
 
           ClipRRect(
             borderRadius: AppRadius.fullAll,
@@ -561,7 +695,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.red600),
             ),
           ),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -578,7 +712,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
           // 카드 사용 내역 토글
           if (hasCardData) ...[
-            SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.md),
             GestureDetector(
               onTap: () => setState(() => _showCardUsage = !_showCardUsage),
               child: Container(
@@ -591,15 +725,20 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.credit_card, size: 14, color: AppColors.gray500),
-                    SizedBox(width: AppSpacing.xs),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
                       _showCardUsage ? '카드 사용 내역 접기' : '카드 사용 내역 보기',
-                      style: AppTypography.caption.copyWith(color: AppColors.gray500),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.gray500,
+                      ),
                     ),
-                    SizedBox(width: AppSpacing.xs),
+                    const SizedBox(width: AppSpacing.xs),
                     Icon(
-                      _showCardUsage ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-                      size: 14, color: AppColors.gray500,
+                      _showCardUsage
+                          ? LucideIcons.chevronUp
+                          : LucideIcons.chevronDown,
+                      size: 14,
+                      color: AppColors.gray500,
                     ),
                   ],
                 ),
@@ -620,32 +759,63 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         padding: EdgeInsets.only(bottom: AppSpacing.sm),
                         child: Row(
                           children: [
-                            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                            SizedBox(width: AppSpacing.sm),
-                            Expanded(child: Text(entry.key, style: AppTypography.bodySmall)),
-                            Text(formatKoreanWon(entry.value), style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                            SizedBox(width: AppSpacing.sm),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                entry.key,
+                                style: AppTypography.bodySmall,
+                              ),
+                            ),
+                            Text(
+                              formatKoreanWon(entry.value),
+                              style: AppTypography.bodySmall.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
                             SizedBox(
                               width: 32,
-                              child: Text('${(pct * 100).round()}%', style: AppTypography.caption.copyWith(color: AppColors.gray500), textAlign: TextAlign.right),
+                              child: Text(
+                                '${(pct * 100).round()}%',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.gray500,
+                                ),
+                                textAlign: TextAlign.right,
+                              ),
                             ),
                           ],
                         ),
                       );
                     }),
                     Divider(height: 1, color: AppColors.gray100),
-                    SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.sm),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('카드 합계', style: AppTypography.label.copyWith(fontSize: 12)),
-                        Text(formatKoreanWon(cardTotal), style: AppTypography.label.copyWith(fontSize: 12)),
+                        Text(
+                          '카드 합계',
+                          style: AppTypography.label.copyWith(fontSize: 12),
+                        ),
+                        Text(
+                          formatKoreanWon(cardTotal),
+                          style: AppTypography.label.copyWith(fontSize: 12),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              crossFadeState: _showCardUsage ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              crossFadeState: _showCardUsage
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
               duration: Duration(milliseconds: 250),
             ),
           ],
@@ -653,7 +823,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       ),
     );
   }
-
 
   void _showImportSheet() {
     String? selectedCardId;
@@ -677,12 +846,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             children: [
               // ── Step 1: 카드사 선택 ──
               Text('카드사 선택', style: AppTypography.label),
-              SizedBox(height: AppSpacing.sm),
-              Text(
-                '업로드할 명세서의 카드사를 선택하세요',
-                style: AppTypography.caption,
-              ),
-              SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
+              Text('업로드할 명세서의 카드사를 선택하세요', style: AppTypography.caption),
+              const SizedBox(height: AppSpacing.md),
 
               // 카드사 그리드
               GridView.builder(
@@ -704,8 +870,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     color: isSelected
                         ? AppColors.emerald50
                         : isEnabled
-                            ? Colors.white
-                            : AppColors.gray50,
+                        ? Colors.white
+                        : AppColors.gray50,
                     borderRadius: AppRadius.smAll,
                     child: InkWell(
                       onTap: isEnabled
@@ -731,13 +897,14 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                             Text(
                               card.name,
                               style: AppTypography.bodySmall.copyWith(
-                                fontWeight:
-                                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                                 color: isSelected
                                     ? AppColors.emerald700
                                     : isEnabled
-                                        ? AppColors.gray700
-                                        : AppColors.gray400,
+                                    ? AppColors.gray700
+                                    : AppColors.gray400,
                               ),
                             ),
                             if (!isEnabled) ...[
@@ -760,7 +927,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
               // ── 선택된 카드사 정보 ──
               if (selectedCard != null) ...[
-                SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(AppSpacing.md),
@@ -770,8 +937,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(LucideIcons.info, size: 16, color: AppColors.emerald600),
-                      SizedBox(width: AppSpacing.sm),
+                      Icon(
+                        LucideIcons.info,
+                        size: 16,
+                        color: AppColors.emerald600,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Text(
                         '${selectedCard.name}: ${selectedCard.format} 지원',
                         style: AppTypography.bodySmall.copyWith(
@@ -782,11 +953,11 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   ),
                 ),
 
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
 
                 // ── Step 2: 파일 업로드 영역 ──
                 Text('파일 업로드', style: AppTypography.label),
-                SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.sm),
 
                 Container(
                   width: double.infinity,
@@ -803,12 +974,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         size: 32,
                         color: AppColors.gray400,
                       ),
-                      SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         '${selectedCard.format} 파일을 선택하세요',
                         style: AppTypography.bodySmall,
                       ),
-                      SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.md),
 
                       // 파일 선택 버튼
                       if (selectedFileName != null)
@@ -817,12 +988,18 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(LucideIcons.fileCheck, size: 14, color: AppColors.emerald600),
+                              Icon(
+                                LucideIcons.fileCheck,
+                                size: 14,
+                                color: AppColors.emerald600,
+                              ),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   selectedFileName!,
-                                  style: AppTypography.bodySmall.copyWith(color: AppColors.emerald700),
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.emerald700,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -838,7 +1015,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                               type: FileType.custom,
                               allowedExtensions: ['xls', 'xlsx', 'csv'],
                             );
-                            if (result != null && result.files.single.path != null) {
+                            if (result != null &&
+                                result.files.single.path != null) {
                               setSheetState(() {
                                 selectedFilePath = result.files.single.path;
                                 selectedFileName = result.files.single.name;
@@ -855,10 +1033,16 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(LucideIcons.file, size: 14, color: Colors.white),
+                                Icon(
+                                  LucideIcons.file,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
                                 SizedBox(width: 6),
                                 Text(
-                                  selectedFileName != null ? '다른 파일 선택' : '파일 선택',
+                                  selectedFileName != null
+                                      ? '다른 파일 선택'
+                                      : '파일 선택',
                                   style: AppTypography.bodySmall.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -873,7 +1057,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   ),
                 ),
 
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
 
                 // 안내 문구
                 Container(
@@ -887,7 +1071,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('안내', style: AppTypography.label),
-                      SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.xs),
                       _buildGuideRow('카드사 홈페이지에서 이용내역을 다운로드하세요'),
                       _buildGuideRow('파일 업로드 후 내역을 미리보기로 확인할 수 있습니다'),
                       _buildGuideRow('중복 거래는 자동으로 감지됩니다'),
@@ -897,18 +1081,31 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
                 // ── 업로드 버튼 ──
                 if (selectedFilePath != null) ...[
-                  SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.xl),
                   AlButton(
                     label: isUploading ? '업로드 중...' : '업로드',
                     icon: isUploading
-                        ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Icon(LucideIcons.upload, size: 18, color: Colors.white),
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Icon(
+                            LucideIcons.upload,
+                            size: 18,
+                            color: Colors.white,
+                          ),
                     onPressed: isUploading
                         ? () {}
                         : () async {
                             setSheetState(() => isUploading = true);
                             try {
-                              final result = await ref.read(transactionServiceProvider).importTransactions(
+                              final result = await ref
+                                  .read(transactionServiceProvider)
+                                  .importTransactions(
                                     cardCompany: selectedCardId!,
                                     targetMonth: _monthKey,
                                     filePath: selectedFilePath!,
@@ -917,12 +1114,19 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                               final count = result['imported'] ?? 0;
                               if (mounted) {
                                 Navigator.of(context).pop();
-                                ref.invalidate(transactionNotifierProvider(_monthKey));
-                                showSuccessSnackBar(context, '$count건의 내역을 업로드하였습니다');
+                                ref.invalidate(
+                                  transactionNotifierProvider(_monthKey),
+                                );
+                                showSuccessSnackBar(
+                                  context,
+                                  '$count건의 내역을 업로드하였습니다',
+                                );
                               }
                             } catch (e) {
                               setSheetState(() => isUploading = false);
-                              if (mounted) showErrorSnackBar(context, '업로드 실패: $e');
+                              if (mounted) {
+                                showErrorSnackBar(context, '업로드 실패: $e');
+                              }
                             }
                           },
                   ),
@@ -942,9 +1146,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('• ', style: AppTypography.caption),
-          Expanded(
-            child: Text(text, style: AppTypography.caption),
-          ),
+          Expanded(child: Text(text, style: AppTypography.caption)),
         ],
       ),
     );
@@ -975,7 +1177,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               color: AppColors.emerald600,
             ),
           ),
-          SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.md),
 
           // 텍스트
           Expanded(
@@ -984,14 +1186,11 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               children: [
                 Text('명세서 가져오기', style: AppTypography.label),
                 SizedBox(height: 2),
-                Text(
-                  'CSV, Excel 파일 업로드',
-                  style: AppTypography.caption,
-                ),
+                Text('CSV, Excel 파일 업로드', style: AppTypography.caption),
               ],
             ),
           ),
-          SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.md),
 
           // 파일 선택 버튼
           Material(
@@ -1036,15 +1235,21 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   /// 그룹핑된 거래를 그룹 키 목록과 함께 반환 (선택 모드에서 사용)
   List<String> _getGroupKeys(List<Transaction> transactions) {
     final keys = <String>[];
-    final incomes = transactions.where((t) => t.type == TransactionType.income).toList();
-    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final incomes = transactions
+        .where((t) => t.type == TransactionType.income)
+        .toList();
+    final expenses = transactions
+        .where((t) => t.type == TransactionType.expense)
+        .toList();
     for (final tx in incomes) {
       final key = 'income_${tx.paymentMethod ?? '기타소득'}';
       if (!keys.contains(key)) keys.add(key);
     }
     for (final tx in expenses) {
       final method = tx.paymentMethod;
-      final label = (method != null && method.contains('카드')) ? method : (method ?? '기타');
+      final label = (method != null && method.contains('카드'))
+          ? method
+          : (method ?? '기타');
       final key = 'expense_$label';
       if (!keys.contains(key)) keys.add(key);
     }
@@ -1052,7 +1257,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   }
 
   // 공유 거래의 소유자 정보 (txId → {name, nickname, color})
-  final Map<String, ({String name, String? nickname, String? color})> _sharedTxOwners = {};
+  final Map<String, ({String name, String? nickname, String? color})>
+  _sharedTxOwners = {};
 
   List<Widget> _buildGroupedTransactions(List<Transaction> myTransactions) {
     // 그룹 모드일 때 공유 거래를 합침
@@ -1067,7 +1273,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         try {
           // subCategory가 snake_case일 수 있으므로 fallback 처리
           final normalized = Map<String, dynamic>.from(raw);
-          if (!normalized.containsKey('subCategory') && normalized.containsKey('sub_category')) {
+          if (!normalized.containsKey('subCategory') &&
+              normalized.containsKey('sub_category')) {
             normalized['subCategory'] = normalized['sub_category'];
           }
           final tx = Transaction.fromMap(normalized);
@@ -1084,10 +1291,15 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
     if (transactions.isEmpty) return [];
 
-    final incomes = transactions.where((t) => t.type == TransactionType.income).toList();
-    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final incomes = transactions
+        .where((t) => t.type == TransactionType.income)
+        .toList();
+    final expenses = transactions
+        .where((t) => t.type == TransactionType.expense)
+        .toList();
     final showIncome = _txFilter == null || _txFilter == TransactionType.income;
-    final showExpense = _txFilter == null || _txFilter == TransactionType.expense;
+    final showExpense =
+        _txFilter == null || _txFilter == TransactionType.expense;
 
     final widgets = <Widget>[];
 
@@ -1101,7 +1313,15 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       for (final entry in grouped.entries) {
         final groupKey = 'income_${entry.key}';
         final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
-        widgets.add(_buildTxGroupCard(groupKey, entry.key, entry.value, groupTotal, AppColors.emerald600));
+        widgets.add(
+          _buildTxGroupCard(
+            groupKey,
+            entry.key,
+            entry.value,
+            groupTotal,
+            AppColors.emerald600,
+          ),
+        );
       }
     }
 
@@ -1110,22 +1330,40 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       final grouped = <String, List<Transaction>>{};
       for (final tx in expenses) {
         final method = tx.paymentMethod;
-        final label = (method != null && method.contains('카드')) ? method : (method ?? '기타');
+        final label = (method != null && method.contains('카드'))
+            ? method
+            : (method ?? '기타');
         grouped.putIfAbsent(label, () => []).add(tx);
       }
       for (final entry in grouped.entries) {
         final groupKey = 'expense_${entry.key}';
         final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
-        widgets.add(_buildTxGroupCard(groupKey, entry.key, entry.value, groupTotal, AppColors.red600));
+        widgets.add(
+          _buildTxGroupCard(
+            groupKey,
+            entry.key,
+            entry.value,
+            groupTotal,
+            AppColors.red600,
+          ),
+        );
       }
     }
 
     return widgets;
   }
 
-  Widget _buildTxGroupCard(String groupKey, String label, List<Transaction> items, int total, Color color) {
+  Widget _buildTxGroupCard(
+    String groupKey,
+    String label,
+    List<Transaction> items,
+    int total,
+    Color color,
+  ) {
     final isExpanded = _expandedTxGroups.contains(groupKey) || _isSelectMode;
-    final myCount = items.where((t) => !_sharedTxOwners.containsKey(t.id)).length;
+    final myCount = items
+        .where((t) => !_sharedTxOwners.containsKey(t.id))
+        .length;
     final sharedCount = items.length - myCount;
 
     return Padding(
@@ -1136,46 +1374,76 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           children: [
             // 그룹 헤더
             InkWell(
-              onTap: _isSelectMode ? null : () => setState(() {
-                if (_expandedTxGroups.contains(groupKey)) {
-                  _expandedTxGroups.remove(groupKey);
-                } else {
-                  _expandedTxGroups.add(groupKey);
-                }
-              }),
+              onTap: _isSelectMode
+                  ? null
+                  : () => setState(() {
+                      if (_expandedTxGroups.contains(groupKey)) {
+                        _expandedTxGroups.remove(groupKey);
+                      } else {
+                        _expandedTxGroups.add(groupKey);
+                      }
+                    }),
               borderRadius: isExpanded
-                  ? BorderRadius.only(topLeft: Radius.circular(AppRadius.lg), topRight: Radius.circular(AppRadius.lg))
+                  ? BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.lg),
+                      topRight: Radius.circular(AppRadius.lg),
+                    )
                   : AppRadius.lgAll,
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.cardPadding),
                 child: Row(
                   children: [
                     Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: AppRadius.smAll),
-                      child: Center(child: Text('${items.length}', style: AppTypography.label.copyWith(color: color))),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.smAll,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${items.length}',
+                          style: AppTypography.label.copyWith(color: color),
+                        ),
+                      ),
                     ),
-                    SizedBox(width: AppSpacing.md),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(label, style: AppTypography.label),
-                        SizedBox(height: 2),
-                        Row(children: [
-                          Text('$myCount건', style: AppTypography.caption),
-                          if (sharedCount > 0) ...[
-                            SizedBox(width: AppSpacing.xs),
-                            Text('· 공유 $sharedCount건', style: AppTypography.caption.copyWith(color: AppColors.teal500)),
-                          ],
-                        ]),
-                      ],
-                    )),
-                    Text(formatKoreanWon(total), style: AppTypography.amountSmall.copyWith(color: color)),
-                    SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label, style: AppTypography.label),
+                          SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text('$myCount건', style: AppTypography.caption),
+                              if (sharedCount > 0) ...[
+                                const SizedBox(width: AppSpacing.xs),
+                                Text(
+                                  '· 공유 $sharedCount건',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.teal500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      formatKoreanWon(total),
+                      style: AppTypography.amountSmall.copyWith(color: color),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
                     AnimatedRotation(
                       turns: isExpanded ? 0.5 : 0,
                       duration: Duration(milliseconds: 200),
-                      child: Icon(LucideIcons.chevronDown, size: 20, color: AppColors.gray400),
+                      child: Icon(
+                        LucideIcons.chevronDown,
+                        size: 20,
+                        color: AppColors.gray400,
+                      ),
                     ),
                   ],
                 ),
@@ -1190,7 +1458,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                   ...items.map((tx) => _buildInlineTransactionItem(tx)),
                 ],
               ),
-              crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              crossFadeState: isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
               duration: Duration(milliseconds: 200),
             ),
           ],
@@ -1223,59 +1493,113 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     final ownerName = ownerInfo?.nickname ?? ownerInfo?.name;
     final ownerColor = ownerInfo?.color != null
         ? Color(int.parse('FF${ownerInfo!.color!.substring(1)}', radix: 16))
-        : (isShared && ownerName != null ? _getOwnerColor(ownerName) : AppColors.teal500);
+        : (isShared && ownerName != null
+              ? _getOwnerColor(ownerName)
+              : AppColors.teal500);
 
     return GestureDetector(
       onTap: _isSelectMode
           ? (isShared ? null : () => _toggleSelection(tx.id))
           : (isShared ? null : () => _showEditEntrySheet(tx)),
-      onLongPress: (_isSelectMode || isShared) ? null : () {
-        AlConfirmDialog.show(
-          context: context,
-          title: '거래 삭제',
-          message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-          onConfirm: () async {
-            await ref.read(transactionNotifierProvider(_monthKey).notifier).deleteTransaction(tx.id);
-            if (mounted) showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
-          },
-        );
-      },
+      onLongPress: (_isSelectMode || isShared)
+          ? null
+          : () {
+              AlConfirmDialog.show(
+                context: context,
+                title: '거래 삭제',
+                message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                onConfirm: () async {
+                  await ref
+                      .read(transactionNotifierProvider(_monthKey).notifier)
+                      .deleteTransaction(tx.id);
+                  if (mounted) {
+                    showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+                  }
+                },
+              );
+            },
       child: Container(
-        decoration: isShared ? BoxDecoration(
-          color: ownerColor.withValues(alpha: 0.04),
-        ) : null,
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding, vertical: AppSpacing.md),
+        decoration: isShared
+            ? BoxDecoration(color: ownerColor.withValues(alpha: 0.04))
+            : null,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.cardPadding,
+          vertical: AppSpacing.md,
+        ),
         child: Row(
           children: [
             if (_isSelectMode && !isShared) ...[
               Icon(
-                _selectedIds.contains(tx.id) ? LucideIcons.checkCircle2 : LucideIcons.circle,
-                size: 20, color: _selectedIds.contains(tx.id) ? AppColors.emerald600 : AppColors.gray300,
+                _selectedIds.contains(tx.id)
+                    ? LucideIcons.checkCircle2
+                    : LucideIcons.circle,
+                size: 20,
+                color: _selectedIds.contains(tx.id)
+                    ? AppColors.emerald600
+                    : AppColors.gray300,
               ),
-              SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
             ],
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tx.name, style: AppTypography.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 1),
-                SizedBox(height: AppSpacing.xs),
-                Row(children: [
-                  Text(tx.category, style: AppTypography.caption),
-                  SizedBox(width: AppSpacing.sm),
-                  Text(tx.subCategory, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
-                  SizedBox(width: AppSpacing.sm),
-                  Text(tx.date.length >= 10 ? tx.date.substring(0, 10) : tx.date, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
-                  if (isShared && ownerName != null) ...[
-                    SizedBox(width: AppSpacing.sm),
-                    Flexible(child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
-                      child: Text(ownerName, style: AppTypography.caption.copyWith(color: ownerColor, fontSize: 10, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
-                    )),
-                  ],
-                ]),
-              ],
-            )),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tx.name,
+                    style: AppTypography.bodyMedium,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      Text(tx.category, style: AppTypography.caption),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        tx.subCategory,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        tx.date.length >= 10
+                            ? tx.date.substring(0, 10)
+                            : tx.date,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                      if (isShared && ownerName != null) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        Flexible(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ownerColor.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.fullAll,
+                            ),
+                            child: Text(
+                              ownerName,
+                              style: AppTypography.caption.copyWith(
+                                color: ownerColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
             Text(
               '${isIncome ? '+' : '-'}${formatKoreanWon(tx.amount)}',
               style: AppTypography.bodyMedium.copyWith(
@@ -1288,7 +1612,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       ),
     );
   }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -1300,7 +1623,12 @@ class _ManualEntryForm extends StatefulWidget {
   final List<Map<String, dynamic>> shareGroups;
   final List<String> initialShareGroupIds;
 
-  const _ManualEntryForm({required this.onSubmit, this.initialData, this.shareGroups = const [], this.initialShareGroupIds = const []});
+  const _ManualEntryForm({
+    required this.onSubmit,
+    this.initialData,
+    this.shareGroups = const [],
+    this.initialShareGroupIds = const [],
+  });
 
   bool get isEditMode => initialData != null;
 
@@ -1352,8 +1680,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
   List<String> get _categories =>
       _type == 'income' ? _incomeCategories : _expenseCategories;
 
-  List<String> get _subCategories =>
-      _subCategoryMap[_selectedCategory] ?? [];
+  List<String> get _subCategories => _subCategoryMap[_selectedCategory] ?? [];
 
   @override
   void initState() {
@@ -1376,21 +1703,28 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       }
 
       // 수입 관련
-      _selectedIncomeSource = IncomeSource.fromString(data['incomeSource'] as String? ?? 'earned');
+      _selectedIncomeSource = IncomeSource.fromString(
+        data['incomeSource'] as String? ?? 'earned',
+      );
 
       // 지출 관련
       final pm = data['paymentMethod'] as String? ?? '';
       if (pm.contains('카드')) {
         _isCreditCardMode = true;
-        _selectedCreditCard = PaymentMethod.fromString(pm) ?? PaymentMethod.shinhan;
+        _selectedCreditCard =
+            PaymentMethod.fromString(pm) ?? PaymentMethod.shinhan;
       } else {
         _isCreditCardMode = false;
-        _selectedPaymentMethod = PaymentMethod.fromString(pm) ?? PaymentMethod.bankTransfer;
+        _selectedPaymentMethod =
+            PaymentMethod.fromString(pm) ?? PaymentMethod.bankTransfer;
       }
-      _selectedTransferAccount = data['transferAccount'] as String? ?? _transferAccounts.first;
+      _selectedTransferAccount =
+          data['transferAccount'] as String? ?? _transferAccounts.first;
       _isInstallment = data['isInstallment'] == 'true';
-      _installmentMonthsController.text = data['installmentMonths'] as String? ?? '';
-      _installmentRoundController.text = data['installmentRound'] as String? ?? '';
+      _installmentMonthsController.text =
+          data['installmentMonths'] as String? ?? '';
+      _installmentRoundController.text =
+          data['installmentRound'] as String? ?? '';
     }
 
     // 초기 공유 그룹 선택 상태
@@ -1426,12 +1760,13 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
     }
 
     final entry = {
-      'id': widget.initialData?['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      'id':
+          widget.initialData?['id'] ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       'type': _type,
       'name': name,
       'amount': amount,
-      'date':
-          '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+      'date': toDateKey(_selectedDate),
       'category': _selectedCategory,
       'subCategory': _selectedSubCategory,
       'editedBy': '나',
@@ -1492,7 +1827,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
       children: [
         // Type toggle (income / expense)
         _buildTypeToggle(),
-        SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.xl),
 
         // Name
         AlInput(
@@ -1500,7 +1835,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           placeholder: '예: 월급, 식료품 등',
           controller: _nameController,
         ),
-        SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.lg),
 
         // Amount
         AlInput(
@@ -1509,13 +1844,17 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
           controller: _amountController,
           keyboardType: TextInputType.number,
           inputFormatters: [CurrencyInputFormatter()],
-          prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
+          prefixIcon: Icon(
+            LucideIcons.banknote,
+            size: 16,
+            color: AppColors.gray500,
+          ),
         ),
-        SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.lg),
 
         // Date
         Text('날짜', style: AppTypography.label),
-        SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.sm),
         GestureDetector(
           onTap: _pickDate,
           child: Container(
@@ -1531,34 +1870,31 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
             child: Row(
               children: [
                 Icon(LucideIcons.calendar, size: 16, color: AppColors.gray500),
-                SizedBox(width: AppSpacing.sm),
-                Text(
-                  '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
-                  style: AppTypography.bodyLarge,
-                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(toDateKey(_selectedDate), style: AppTypography.bodyLarge),
               ],
             ),
           ),
         ),
-        SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.lg),
 
         // ── 수입: 입금 계좌 ──
         if (_type == 'income') ...[
           Text('소득 구분', style: AppTypography.label),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           _buildEnumDropdown<IncomeSource>(
             value: _selectedIncomeSource,
             items: IncomeSource.values,
             labelOf: (e) => e.label,
             onChanged: (val) => setState(() => _selectedIncomeSource = val!),
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
         ],
 
         // ── 지출: 지불 방법 ──
         if (_type == 'expense') ...[
           Text('지불 방법', style: AppTypography.label),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           // 신용카드 vs 기타
           _buildEnumDropdown<PaymentMethod>(
             value: _isCreditCardMode
@@ -1578,19 +1914,19 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
               });
             },
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
 
           // 지출 > 신용카드 선택 시: 카드 종류 + 할부
           if (_isCreditCardMode) ...[
             Text('카드 종류', style: AppTypography.label),
-            SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
             _buildEnumDropdown<PaymentMethod>(
               value: _selectedCreditCard,
               items: cardCompanies,
               labelOf: (e) => e.value,
               onChanged: (val) => setState(() => _selectedCreditCard = val!),
             ),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
 
             // 할부 결제 섹션
             Container(
@@ -1598,14 +1934,17 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                 color: _isInstallment ? AppColors.emerald50 : AppColors.gray50,
                 borderRadius: AppRadius.mdAll,
                 border: Border.all(
-                  color: _isInstallment ? AppColors.emerald200 : AppColors.gray200,
+                  color: _isInstallment
+                      ? AppColors.emerald200
+                      : AppColors.gray200,
                 ),
               ),
               child: Column(
                 children: [
                   // 할부 토글 헤더
                   GestureDetector(
-                    onTap: () => setState(() => _isInstallment = !_isInstallment),
+                    onTap: () =>
+                        setState(() => _isInstallment = !_isInstallment),
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: EdgeInsets.symmetric(
@@ -1631,7 +1970,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                                   : AppColors.gray400,
                             ),
                           ),
-                          SizedBox(width: AppSpacing.md),
+                          const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1647,7 +1986,9 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                           ),
                           // 커스텀 토글
                           GestureDetector(
-                            onTap: () => setState(() => _isInstallment = !_isInstallment),
+                            onTap: () => setState(
+                              () => _isInstallment = !_isInstallment,
+                            ),
                             child: AnimatedContainer(
                               duration: Duration(milliseconds: 200),
                               width: 44,
@@ -1673,7 +2014,9 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         blurRadius: 4,
                                         offset: Offset(0, 1),
                                       ),
@@ -1708,10 +2051,13 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('할부 기간', style: AppTypography.caption.copyWith(
-                                  color: AppColors.gray600,
-                                )),
-                                SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  '할부 기간',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.gray600,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
                                 Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -1722,32 +2068,39 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                                     children: [
                                       Expanded(
                                         child: TextField(
-                                          controller: _installmentMonthsController,
+                                          controller:
+                                              _installmentMonthsController,
                                           keyboardType: TextInputType.number,
                                           textAlign: TextAlign.center,
-                                          style: AppTypography.bodyLarge.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: AppTypography.bodyLarge
+                                              .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                           decoration: InputDecoration(
                                             hintText: '12',
-                                            hintStyle: AppTypography.bodyLarge.copyWith(
-                                              color: AppColors.gray300,
-                                            ),
+                                            hintStyle: AppTypography.bodyLarge
+                                                .copyWith(
+                                                  color: AppColors.gray300,
+                                                ),
                                             border: InputBorder.none,
-                                            contentPadding: EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.sm,
-                                              vertical: AppSpacing.sm,
-                                            ),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: AppSpacing.sm,
+                                                  vertical: AppSpacing.sm,
+                                                ),
                                           ),
                                         ),
                                       ),
                                       Padding(
-                                        padding: EdgeInsets.only(right: AppSpacing.lg),
+                                        padding: EdgeInsets.only(
+                                          right: AppSpacing.lg,
+                                        ),
                                         child: Text(
                                           '개월',
-                                          style: AppTypography.bodySmall.copyWith(
-                                            color: AppColors.gray500,
-                                          ),
+                                          style: AppTypography.bodySmall
+                                              .copyWith(
+                                                color: AppColors.gray500,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -1756,15 +2109,18 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                               ],
                             ),
                           ),
-                          SizedBox(width: AppSpacing.md),
+                          const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('현재 회차', style: AppTypography.caption.copyWith(
-                                  color: AppColors.gray600,
-                                )),
-                                SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  '현재 회차',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.gray600,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
                                 Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -1775,32 +2131,39 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                                     children: [
                                       Expanded(
                                         child: TextField(
-                                          controller: _installmentRoundController,
+                                          controller:
+                                              _installmentRoundController,
                                           keyboardType: TextInputType.number,
                                           textAlign: TextAlign.center,
-                                          style: AppTypography.bodyLarge.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: AppTypography.bodyLarge
+                                              .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                           decoration: InputDecoration(
                                             hintText: '3',
-                                            hintStyle: AppTypography.bodyLarge.copyWith(
-                                              color: AppColors.gray300,
-                                            ),
+                                            hintStyle: AppTypography.bodyLarge
+                                                .copyWith(
+                                                  color: AppColors.gray300,
+                                                ),
                                             border: InputBorder.none,
-                                            contentPadding: EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.sm,
-                                              vertical: AppSpacing.sm,
-                                            ),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: AppSpacing.sm,
+                                                  vertical: AppSpacing.sm,
+                                                ),
                                           ),
                                         ),
                                       ),
                                       Padding(
-                                        padding: EdgeInsets.only(right: AppSpacing.lg),
+                                        padding: EdgeInsets.only(
+                                          right: AppSpacing.lg,
+                                        ),
                                         child: Text(
                                           '회차',
-                                          style: AppTypography.bodySmall.copyWith(
-                                            color: AppColors.gray500,
-                                          ),
+                                          style: AppTypography.bodySmall
+                                              .copyWith(
+                                                color: AppColors.gray500,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -1816,25 +2179,27 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
                 ],
               ),
             ),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
           ],
 
           // 지출 > 계좌이체 선택 시: 출금 계좌
-          if (!_isCreditCardMode && _selectedPaymentMethod == PaymentMethod.bankTransfer) ...[
+          if (!_isCreditCardMode &&
+              _selectedPaymentMethod == PaymentMethod.bankTransfer) ...[
             Text('출금 계좌', style: AppTypography.label),
-            SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
             _buildDropdown(
               value: _selectedTransferAccount,
               items: _transferAccounts,
-              onChanged: (val) => setState(() => _selectedTransferAccount = val!),
+              onChanged: (val) =>
+                  setState(() => _selectedTransferAccount = val!),
             ),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
           ],
         ],
 
         // ── 카테고리 (수입/지출 공통, 폼 하단) ──
         Text('카테고리', style: AppTypography.label),
-        SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.sm),
         _buildDropdown(
           value: _categories.contains(_selectedCategory)
               ? _selectedCategory
@@ -1850,11 +2215,11 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
             }
           },
         ),
-        SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.lg),
 
         // 세부 카테고리
         Text('세부 카테고리', style: AppTypography.label),
-        SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.sm),
         _buildDropdown(
           value: _subCategories.contains(_selectedSubCategory)
               ? _selectedSubCategory
@@ -1866,9 +2231,9 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
         ),
         // 공유 그룹 선택
         if (widget.shareGroups.isNotEmpty) ...[
-          SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.xl),
           Text('공유 그룹', style: AppTypography.label),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -1878,28 +2243,44 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
               final isSelected = _selectedGroupIds.contains(groupId);
               return GestureDetector(
                 onTap: () => setState(() {
-                  if (isSelected) { _selectedGroupIds.remove(groupId); }
-                  else { _selectedGroupIds.add(groupId); }
+                  if (isSelected) {
+                    _selectedGroupIds.remove(groupId);
+                  } else {
+                    _selectedGroupIds.add(groupId);
+                  }
                 }),
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.emerald50 : AppColors.gray50,
                     borderRadius: AppRadius.fullAll,
-                    border: Border.all(color: isSelected ? AppColors.emerald500 : AppColors.gray200),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.emerald500
+                          : AppColors.gray200,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                        isSelected
+                            ? LucideIcons.checkCircle2
+                            : LucideIcons.circle,
                         size: 14,
-                        color: isSelected ? AppColors.emerald600 : AppColors.gray400,
+                        color: isSelected
+                            ? AppColors.emerald600
+                            : AppColors.gray400,
                       ),
                       SizedBox(width: 6),
-                      Text(groupName, style: AppTypography.bodySmall.copyWith(
-                        color: isSelected ? AppColors.emerald700 : AppColors.gray600,
-                      )),
+                      Text(
+                        groupName,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: isSelected
+                              ? AppColors.emerald700
+                              : AppColors.gray600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1907,7 +2288,7 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
             }).toList(),
           ),
         ],
-        SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.xl),
 
         // Submit
         AlButton(
@@ -1939,7 +2320,11 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: Icon(LucideIcons.chevronDown, size: 16, color: AppColors.gray500),
+          icon: Icon(
+            LucideIcons.chevronDown,
+            size: 16,
+            color: AppColors.gray500,
+          ),
           style: AppTypography.bodyLarge,
           items: items
               .map((item) => DropdownMenuItem(value: item, child: Text(item)))
@@ -1967,10 +2352,17 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          icon: Icon(LucideIcons.chevronDown, size: 16, color: AppColors.gray500),
+          icon: Icon(
+            LucideIcons.chevronDown,
+            size: 16,
+            color: AppColors.gray500,
+          ),
           style: AppTypography.bodyLarge,
           items: items
-              .map((item) => DropdownMenuItem(value: item, child: Text(labelOf(item))))
+              .map(
+                (item) =>
+                    DropdownMenuItem(value: item, child: Text(labelOf(item))),
+              )
               .toList(),
           onChanged: onChanged,
         ),
@@ -2049,4 +2441,3 @@ class _ManualEntryFormState extends State<_ManualEntryForm> {
     );
   }
 }
-

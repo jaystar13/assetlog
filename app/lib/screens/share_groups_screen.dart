@@ -76,7 +76,7 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
             placeholder: '예: 우리 가족, 자산 스터디',
             controller: nameController,
           ),
-          SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.xl),
           AlButton(
             label: '만들기',
             onPressed: () async {
@@ -102,7 +102,9 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = _receivedInvitations.where((inv) => inv['status'] == 'pending').length;
+    final pendingCount = _receivedInvitations
+        .where((inv) => inv['status'] == 'pending')
+        .length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -128,9 +130,22 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                       if (pendingCount > 0) ...[
                         SizedBox(width: 6),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(color: AppColors.red600, borderRadius: AppRadius.fullAll),
-                          child: Text('$pendingCount', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.red600,
+                            borderRadius: AppRadius.fullAll,
+                          ),
+                          child: Text(
+                            '$pendingCount',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -144,10 +159,7 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                 ? Center(child: CircularProgressIndicator())
                 : TabBarView(
                     controller: _tabController,
-                    children: [
-                      _buildGroupsTab(),
-                      _buildInvitationsTab(),
-                    ],
+                    children: [_buildGroupsTab(), _buildInvitationsTab()],
                   ),
           ),
         ],
@@ -167,17 +179,27 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
             icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
             onPressed: _showCreateGroupSheet,
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           if (_groups.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
               child: Column(
                 children: [
                   Icon(LucideIcons.users, size: 48, color: AppColors.gray300),
-                  SizedBox(height: AppSpacing.md),
-                  Text('아직 그룹이 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500)),
-                  SizedBox(height: AppSpacing.xs),
-                  Text('그룹을 만들고 가족이나 친구를 초대해 보세요', style: AppTypography.caption.copyWith(color: AppColors.gray400)),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    '아직 그룹이 없습니다',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.gray500,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '그룹을 만들고 가족이나 친구를 초대해 보세요',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.gray400,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -189,7 +211,8 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
   }
 
   Widget _buildGroupCard(Map<String, dynamic> group) {
-    final members = (group['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final members =
+        (group['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final itemCount = group['_count']?['sharedItems'] ?? 0;
 
     return GestureDetector(
@@ -205,13 +228,26 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
             children: [
               Row(
                 children: [
-                  Icon(LucideIcons.users, size: 20, color: AppColors.emerald600),
-                  SizedBox(width: AppSpacing.sm),
-                  Expanded(child: Text(group['name'] as String, style: AppTypography.heading3)),
-                  Icon(LucideIcons.chevronRight, size: 18, color: AppColors.gray400),
+                  Icon(
+                    LucideIcons.users,
+                    size: 20,
+                    color: AppColors.emerald600,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      group['name'] as String,
+                      style: AppTypography.heading3,
+                    ),
+                  ),
+                  Icon(
+                    LucideIcons.chevronRight,
+                    size: 18,
+                    color: AppColors.gray400,
+                  ),
                 ],
               ),
-              SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
                   // 멤버 아바타 겹침
@@ -219,8 +255,11 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                     width: (members.length.clamp(0, 4) * 28).toDouble() + 8,
                     height: 32,
                     child: Stack(
-                      children: members.take(4).toList().asMap().entries.map((e) {
-                        final user = e.value['user'] as Map<String, dynamic>? ?? {};
+                      children: members.take(4).toList().asMap().entries.map((
+                        e,
+                      ) {
+                        final user =
+                            e.value['user'] as Map<String, dynamic>? ?? {};
                         final name = user['name'] as String? ?? '?';
                         return Positioned(
                           left: e.key * 28.0,
@@ -233,9 +272,19 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                     ),
                   ),
                   Spacer(),
-                  Text('멤버 ${members.length}명', style: AppTypography.caption.copyWith(color: AppColors.gray500)),
-                  SizedBox(width: AppSpacing.md),
-                  Text('공유 ${itemCount}건', style: AppTypography.caption.copyWith(color: AppColors.gray500)),
+                  Text(
+                    '멤버 ${members.length}명',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.gray500,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    '공유 $itemCount건',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.gray500,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -248,8 +297,12 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
   // ─── 받은 초대 탭 ────────────────────────────
 
   Widget _buildInvitationsTab() {
-    final pending = _receivedInvitations.where((inv) => inv['status'] == 'pending').toList();
-    final others = _receivedInvitations.where((inv) => inv['status'] != 'pending').toList();
+    final pending = _receivedInvitations
+        .where((inv) => inv['status'] == 'pending')
+        .toList();
+    final others = _receivedInvitations
+        .where((inv) => inv['status'] != 'pending')
+        .toList();
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(AppSpacing.screenPadding),
@@ -260,23 +313,37 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
               padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
               child: Column(
                 children: [
-                  Icon(LucideIcons.mailOpen, size: 48, color: AppColors.gray300),
-                  SizedBox(height: AppSpacing.md),
-                  Text('받은 초대가 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500)),
+                  Icon(
+                    LucideIcons.mailOpen,
+                    size: 48,
+                    color: AppColors.gray300,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    '받은 초대가 없습니다',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.gray500,
+                    ),
+                  ),
                 ],
               ),
             ),
           ...pending.map((inv) => _buildInvitationCard(inv, showActions: true)),
           if (others.isNotEmpty) ...[
-            SizedBox(height: AppSpacing.lg),
-            ...others.map((inv) => _buildInvitationCard(inv, showActions: false)),
+            const SizedBox(height: AppSpacing.lg),
+            ...others.map(
+              (inv) => _buildInvitationCard(inv, showActions: false),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildInvitationCard(Map<String, dynamic> inv, {required bool showActions}) {
+  Widget _buildInvitationCard(
+    Map<String, dynamic> inv, {
+    required bool showActions,
+  }) {
     final group = inv['group'] as Map<String, dynamic>? ?? {};
     final inviter = inv['invitedBy'] as Map<String, dynamic>? ?? {};
     final status = inv['status'] as String? ?? 'pending';
@@ -296,14 +363,20 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                   imageUrl: inviter['avatar'] as String?,
                   gradientColors: [AppColors.emerald400, AppColors.teal500],
                 ),
-                SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(group['name'] as String? ?? '', style: AppTypography.heading3),
+                      Text(
+                        group['name'] as String? ?? '',
+                        style: AppTypography.heading3,
+                      ),
                       SizedBox(height: 2),
-                      Text('${inviter['name']}님의 초대 · ${GroupRole.fromString(role).label}', style: AppTypography.caption),
+                      Text(
+                        '${inviter['name']}님의 초대 · ${GroupRole.fromString(role).label}',
+                        style: AppTypography.caption,
+                      ),
                     ],
                   ),
                 ),
@@ -311,13 +384,21 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: status == 'accepted' ? AppColors.emerald50 : AppColors.gray100,
+                      color: status == 'accepted'
+                          ? AppColors.emerald50
+                          : AppColors.gray100,
                       borderRadius: AppRadius.fullAll,
                     ),
                     child: Text(
-                      status == 'accepted' ? '수락' : status == 'declined' ? '거절' : '만료',
+                      status == 'accepted'
+                          ? '수락'
+                          : status == 'declined'
+                          ? '거절'
+                          : '만료',
                       style: AppTypography.caption.copyWith(
-                        color: status == 'accepted' ? AppColors.emerald700 : AppColors.gray500,
+                        color: status == 'accepted'
+                            ? AppColors.emerald700
+                            : AppColors.gray500,
                         fontSize: 10,
                       ),
                     ),
@@ -325,11 +406,17 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
               ],
             ),
             if (message != null && message.isNotEmpty) ...[
-              SizedBox(height: AppSpacing.md),
-              Text('"$message"', style: AppTypography.bodySmall.copyWith(color: AppColors.gray600, fontStyle: FontStyle.italic)),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '"$message"',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.gray600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ],
             if (showActions && status == 'pending') ...[
-              SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
                   Expanded(
@@ -338,7 +425,9 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                       variant: AlButtonVariant.secondary,
                       onPressed: () async {
                         try {
-                          await ref.read(shareGroupServiceProvider).declineInvitation(inv['id'] as String);
+                          await ref
+                              .read(shareGroupServiceProvider)
+                              .declineInvitation(inv['id'] as String);
                           await _loadData();
                           if (mounted) showInfoSnackBar(context, '초대를 거절했습니다');
                         } catch (e) {
@@ -347,15 +436,19 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
                       },
                     ),
                   ),
-                  SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: AlButton(
                       label: '수락',
                       onPressed: () async {
                         try {
-                          await ref.read(shareGroupServiceProvider).acceptInvitation(inv['id'] as String);
+                          await ref
+                              .read(shareGroupServiceProvider)
+                              .acceptInvitation(inv['id'] as String);
                           await _loadData();
-                          if (mounted) showSuccessSnackBar(context, '그룹에 참여했습니다');
+                          if (mounted) {
+                            showSuccessSnackBar(context, '그룹에 참여했습니다');
+                          }
                         } catch (e) {
                           if (mounted) showErrorSnackBar(context, '$e');
                         }

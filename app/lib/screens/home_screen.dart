@@ -102,7 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(LucideIcons.quote, size: 20, color: AppColors.emerald400),
-          SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     height: 1.5,
                   ),
                 ),
-                SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   '— ${quote.author}',
                   style: AppTypography.caption.copyWith(
@@ -146,7 +146,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('자산 목표를 설정하고 달성률을 추적하세요.', style: AppTypography.bodyMedium),
-          SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.xl),
           AlInput(
             label: '시작 금액',
             placeholder: '목표 시작 시점의 자산 금액',
@@ -159,7 +159,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             keyboardType: TextInputType.number,
             inputFormatters: [CurrencyInputFormatter()],
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           AlInput(
             label: '목표 금액',
             placeholder: '목표 금액을 입력하세요',
@@ -172,7 +172,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             keyboardType: TextInputType.number,
             inputFormatters: [CurrencyInputFormatter()],
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           AlInput(
             label: '목표 기한',
             placeholder: 'YYYY-MM-DD',
@@ -183,10 +183,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             controller: _goalDeadlineController,
           ),
-          SizedBox(height: AppSpacing.xl),
-          AlButton(
-            label: '저장',
-            onPressed: () async {
+          const SizedBox(height: AppSpacing.xl),
+          _SaveGoalButton(
+            onSave: () async {
               final startAmount = CurrencyInputFormatter.parse(_goalStartController.text);
               final targetAmount = CurrencyInputFormatter.parse(_goalAmountController.text);
               final deadline = _goalDeadlineController.text.trim();
@@ -196,13 +195,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 return;
               }
 
-              Navigator.of(context).pop();
-
               await ref.read(homeNotifierProvider.notifier).saveGoal(
                     startAmount: startAmount,
                     targetAmount: targetAmount,
                     deadline: deadline,
                   );
+              if (context.mounted) Navigator.of(context).pop();
               if (mounted) showSuccessSnackBar(context, '목표가 설정되었습니다');
             },
           ),
@@ -219,7 +217,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       backgroundColor: AppColors.background,
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('데이터를 불러올 수 없습니다')),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('데이터를 불러올 수 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500)),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () => ref.invalidate(homeNotifierProvider),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
         data: (dashboard) {
           _dashboard = dashboard;
           return SingleChildScrollView(
@@ -233,15 +244,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   child: Column(
                     children: [
-                      SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.lg),
                       _buildDailyQuote(),
-                      SizedBox(height: AppSpacing.sectionGap),
+                      const SizedBox(height: AppSpacing.sectionGap),
                       _buildGoalVisualizerCard(),
-                      SizedBox(height: AppSpacing.sectionGap),
+                      const SizedBox(height: AppSpacing.sectionGap),
                       _buildNetWorthCard(),
-                      SizedBox(height: AppSpacing.sectionGap),
+                      const SizedBox(height: AppSpacing.sectionGap),
                       _buildMonthlyCashFlowCard(),
-                      SizedBox(height: AppSpacing.sectionGap),
+                      const SizedBox(height: AppSpacing.sectionGap),
                       _buildSharedAssetsSection(),
                     ],
                   ),
@@ -286,7 +297,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       _prefs.subtitle,
                       style: AppTypography.bodyMedium.copyWith(
@@ -364,7 +375,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             actionLabel: '목표 설정',
             onAction: _showGoalSettingSheet,
           ),
-          SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.xl),
 
           // ── 출발 / 현재 / 목표 라벨 행 ──
           AnimatedBuilder(
@@ -511,7 +522,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
 
-                  SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.md),
 
                   // ── 달성률 퍼센트 & 현재 금액 ──
                   Row(
@@ -534,7 +545,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           ),
                         ),
                       ),
-                      SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: AppSpacing.sm),
                       Text(
                         formatKoreanWon(_dashboard!.netWorth),
                         style: AppTypography.bodyMedium.copyWith(
@@ -548,7 +559,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             },
           ),
 
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
 
           // ── 남은 금액 메시지 ──
           Container(
@@ -562,7 +573,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(LucideIcons.flag, size: 14, color: AppColors.emerald600),
-                SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   remaining > 0
                       ? '목표까지 ${formatKoreanWon(remaining)} 남았어요!'
@@ -576,7 +587,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
 
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
 
           // 기한 표시
           Center(
@@ -597,7 +608,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AlSectionHeader(title: '순자산'),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -605,7 +616,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 formatKoreanWon(_dashboard!.netWorth),
                 style: AppTypography.amountLarge,
               ),
-              SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.sm),
               Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: AlChangeIndicator.percent(
@@ -614,7 +625,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           AlStatRow(
             dotColor: AppColors.blue600,
             label: '총 자산',
@@ -622,7 +633,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             valueColor: AppColors.blue600,
             backgroundColor: AppColors.blue50,
           ),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           AlStatRow(
             dotColor: AppColors.red600,
             label: '총 부채',
@@ -631,7 +642,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             backgroundColor: AppColors.red50,
           ),
           if (_dashboard!.lastMonthNetWorth != null) ...[
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(AppSpacing.md),
@@ -646,7 +657,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     size: 16,
                     color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald600 : AppColors.red600,
                   ),
-                  SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
                     '전월 대비 ${_dashboard!.netWorthGrowth >= 0 ? '+' : ''}${formatKoreanWon(_dashboard!.netWorthGrowth)}',
                     style: AppTypography.bodySmall.copyWith(
@@ -674,7 +685,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             actionLabel: '상세보기',
             onAction: () => context.go('/cashflow'),
           ),
-          SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
               Expanded(
@@ -682,7 +693,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('수입', style: AppTypography.bodySmall),
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(_dashboard!.monthlyIncome),
                       style: AppTypography.amountSmall.copyWith(
@@ -697,7 +708,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text('지출', style: AppTypography.bodySmall),
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       formatKoreanWon(_dashboard!.monthlyExpense),
                       style: AppTypography.amountSmall.copyWith(
@@ -709,7 +720,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
           // Progress bar
           ClipRRect(
             borderRadius: AppRadius.fullAll,
@@ -729,7 +740,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             '지출 비율: ${_dashboard!.monthlyIncome > 0 ? (_dashboard!.monthlyExpense / _dashboard!.monthlyIncome * 100).round() : 0}%',
             style: AppTypography.caption,
@@ -751,7 +762,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           actionLabel: '전체 보기',
           onAction: () => context.go('/more/groups'),
         ),
-        SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.md),
         if (sharedGroups.isEmpty)
           AlCard(
             child: Center(
@@ -760,7 +771,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 child: Column(
                   children: [
                     Icon(LucideIcons.users, size: 36, color: AppColors.gray300),
-                    SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       '공유 그룹이 없습니다',
                       style: AppTypography.bodyMedium.copyWith(
@@ -795,7 +806,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
                 child: Icon(LucideIcons.users, size: 22, color: AppColors.emerald600),
               ),
-              SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,5 +827,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
   }
+}
 
+class _SaveGoalButton extends StatefulWidget {
+  final Future<void> Function() onSave;
+  const _SaveGoalButton({required this.onSave});
+
+  @override
+  State<_SaveGoalButton> createState() => _SaveGoalButtonState();
+}
+
+class _SaveGoalButtonState extends State<_SaveGoalButton> {
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlButton(
+      label: _isSaving ? '저장 중...' : '저장',
+      onPressed: _isSaving ? null : () async {
+        setState(() => _isSaving = true);
+        try {
+          await widget.onSave();
+        } catch (e) {
+          if (mounted) showErrorSnackBar(context, '저장 실패: $e');
+        } finally {
+          if (mounted) setState(() => _isSaving = false);
+        }
+      },
+    );
+  }
 }

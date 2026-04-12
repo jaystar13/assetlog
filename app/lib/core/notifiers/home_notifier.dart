@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/enums.dart';
 import '../../models/transaction.dart';
+import '../../utils/date_format.dart';
 import '../providers.dart';
 
 class FinancialGoal {
@@ -18,7 +19,10 @@ class FinancialGoal {
   factory FinancialGoal.fromJson(Map<String, dynamic> json) => FinancialGoal(
         startAmount: json['startAmount'] as num,
         targetAmount: json['targetAmount'] as num,
-        deadline: (json['deadline'] as String).substring(0, 10),
+        deadline: () {
+          final d = json['deadline'] as String;
+          return d.length >= 10 ? d.substring(0, 10) : d;
+        }(),
       );
 }
 
@@ -75,26 +79,26 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final groupService = ref.watch(shareGroupServiceProvider);
 
     final now = DateTime.now();
-    final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final currentMonth = toMonthKey(now);
 
     // 전월 계산
     final lastMonthDate = DateTime(now.year, now.month - 1);
-    final lastMonth = '${lastMonthDate.year}-${lastMonthDate.month.toString().padLeft(2, '0')}';
+    final lastMonth = toMonthKey(lastMonthDate);
 
-    // 병렬 호출
-    final results = await Future.wait([
-      assetService.getAssets(month: currentMonth),
-      assetService.getAssets(month: lastMonth),
-      txService.getTransactions(month: currentMonth),
-      authService.getGoal(),
-      groupService.getMyGroups(),
+    // 병렬 호출 — 개별 실패 시 기본값으로 대체
+    final futures = await Future.wait([
+      assetService.getAssets(month: currentMonth).catchError((_) => <Map<String, dynamic>>[]),
+      assetService.getAssets(month: lastMonth).catchError((_) => <Map<String, dynamic>>[]),
+      txService.getTransactions(month: currentMonth).catchError((_) => <Transaction>[]),
+      authService.getGoal().catchError((_) => null),
+      groupService.getMyGroups().catchError((_) => <Map<String, dynamic>>[]),
     ]);
 
-    final currentAssets = results[0] as List<Map<String, dynamic>>;
-    final lastMonthAssets = results[1] as List<Map<String, dynamic>>;
-    final transactions = results[2] as List<Transaction>;
-    final goalData = results[3] as Map<String, dynamic>?;
-    final groups = results[4] as List<Map<String, dynamic>>;
+    final currentAssets = futures[0] as List<Map<String, dynamic>>;
+    final lastMonthAssets = futures[1] as List<Map<String, dynamic>>;
+    final transactions = futures[2] as List<Transaction>;
+    final goalData = futures[3] as Map<String, dynamic>?;
+    final groups = futures[4] as List<Map<String, dynamic>>;
 
     // 당월 자산 합계
     final currentTotals = _calcAssetTotals(currentAssets);

@@ -15,9 +15,7 @@ class AuthService {
       final response = await _dio.post(
         '/auth/refresh',
         data: {'refreshToken': refreshToken},
-        options: Options(headers: {
-          'Authorization': 'Bearer $refreshToken',
-        }),
+        options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
       );
       final data = _unwrap(response);
       return (
@@ -42,10 +40,7 @@ class AuthService {
   /// POST /auth/logout — 로그아웃
   Future<void> logout(String refreshToken) async {
     try {
-      await _dio.post(
-        '/auth/logout',
-        data: {'refreshToken': refreshToken},
-      );
+      await _dio.post('/auth/logout', data: {'refreshToken': refreshToken});
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -69,10 +64,7 @@ class AuthService {
     try {
       final response = await _dio.patch(
         '/users/me',
-        data: {
-          if (name != null) 'name': name,
-          if (avatar != null) 'avatar': avatar,
-        },
+        data: {'name': ?name, 'avatar': ?avatar},
       );
       return _unwrap(response);
     } on DioException catch (e) {

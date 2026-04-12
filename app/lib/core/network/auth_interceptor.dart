@@ -67,7 +67,7 @@ class AuthInterceptor extends Interceptor {
 
     try {
       final refreshToken = await _tokenStorage.getRefreshToken();
-      if (refreshToken == null) throw DioException(requestOptions: RequestOptions());
+      if (refreshToken == null) throw DioException(requestOptions: RequestOptions(path: '/auth/refresh'));
 
       final response = await _dio.post(
         '/auth/refresh',

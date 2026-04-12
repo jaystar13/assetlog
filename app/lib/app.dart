@@ -39,18 +39,25 @@ class _AssetLogAppState extends ConsumerState<AssetLogApp> {
     _linkSubscription = deepLinkService.onLink.listen(_handleDeepLink);
   }
 
-  void _handleDeepLink(Uri uri) {
+  Future<void> _handleDeepLink(Uri uri) async {
     if (uri.host != 'auth' || uri.path != '/callback') return;
 
-    final accessToken = uri.queryParameters['access_token'];
-    final refreshToken = uri.queryParameters['refresh_token'];
+    final code = uri.queryParameters['code'];
+    if (code == null) return;
 
-    if (accessToken != null && refreshToken != null) {
-      ref.read(authNotifierProvider.notifier).handleAuthCallback(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          );
+    try {
+      final tokens = await ref.read(authServiceProvider).exchangeAuthCode(code);
+      final accessToken = tokens['accessToken'] as String?;
+      final refreshToken = tokens['refreshToken'] as String?;
 
+      if (accessToken != null && refreshToken != null) {
+        await ref.read(authNotifierProvider.notifier).handleAuthCallback(
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+            );
+      }
+    } catch (_) {
+      // 코드 교환 실패 시 무시 (만료된 코드 등)
     }
   }
 

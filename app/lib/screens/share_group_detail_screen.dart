@@ -17,6 +17,7 @@ import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/providers.dart';
 import '../utils/format_korean_won.dart';
+import '../utils/date_format.dart';
 import '../utils/snackbar_helper.dart';
 
 class ShareGroupDetailScreen extends ConsumerStatefulWidget {
@@ -39,8 +40,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
   List<Map<String, dynamic>> _activityLogs = [];
   bool _isLoading = true;
 
-  String get _monthKey =>
-      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+  String get _monthKey => toMonthKey(_selectedMonth);
 
   @override
   void initState() {
@@ -113,11 +113,11 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AlInput(label: '이메일', placeholder: 'example@email.com', controller: emailController, keyboardType: TextInputType.emailAddress),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
             AlInput(label: '별명', placeholder: '예: 아내, 아들, 친구A', controller: nicknameController),
-            SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
             Text('표시 색상', style: AppTypography.label),
-            SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
@@ -138,7 +138,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
                 );
               }).toList(),
             ),
-            SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xl),
             AlButton(
               label: '초대하기',
               icon: Icon(LucideIcons.send, size: 16, color: Colors.white),
@@ -228,15 +228,15 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
               icon: Icon(LucideIcons.userPlus, size: 18, color: Colors.white),
               onPressed: _showInviteSheet,
             ),
-          if (isAdmin) SizedBox(height: AppSpacing.lg),
+          if (isAdmin) const SizedBox(height: AppSpacing.lg),
 
           // 멤버 목록
           Text('멤버', style: AppTypography.heading3),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
           ..._buildMemberList(members, myUserId, isAdmin),
 
           // 그룹 나가기/삭제
-          SizedBox(height: AppSpacing.sectionGap),
+          const SizedBox(height: AppSpacing.sectionGap),
           if (isAdmin)
             AlButton(
               label: '그룹 삭제',
@@ -252,14 +252,14 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
               onPressed: () => _confirmGroupLeave(),
             ),
           if (isAdmin) ...[
-            SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.xs),
             Text('멤버를 길게 눌러 제거할 수 있습니다', style: AppTypography.caption.copyWith(color: AppColors.gray400)),
           ],
 
           // 활동 이력
-          SizedBox(height: AppSpacing.sectionGap),
+          const SizedBox(height: AppSpacing.sectionGap),
           Text('활동 이력', style: AppTypography.heading3),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
           if (_activityLogs.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
@@ -313,7 +313,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
           child: Row(
             children: [
               Expanded(child: _buildSegmentButton('거래', !_showAssets, () => setState(() => _showAssets = false))),
-              SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(child: _buildSegmentButton('자산', _showAssets, () => setState(() => _showAssets = true))),
             ],
           ),
@@ -385,7 +385,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
                     text: name.isNotEmpty ? name.characters.first : '?',
                     imageUrl: user['avatar'] as String?,
                   ),
-                  SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,7 +435,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(LucideIcons.inbox, size: 48, color: AppColors.gray300),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
           Text('공유된 거래가 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500)),
         ],
       ));
@@ -488,16 +488,16 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name, style: AppTypography.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 1),
-                      SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.xs),
                       Row(children: [
                         Text(category, style: AppTypography.caption),
                         if (subCategory.isNotEmpty) ...[
-                          SizedBox(width: AppSpacing.sm),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(subCategory, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
                         ],
-                        SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.sm),
                         Text(date.length >= 10 ? date.substring(0, 10) : date, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
-                        SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.sm),
                         Flexible(child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),
@@ -530,7 +530,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(LucideIcons.wallet, size: 48, color: AppColors.gray300),
-          SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.md),
           Text('공유된 자산이 없습니다', style: AppTypography.bodyMedium.copyWith(color: AppColors.gray500)),
         ],
       ));
@@ -562,7 +562,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
               child: Row(
                 children: [
                   Icon(config?.icon ?? LucideIcons.folder, size: 20, color: config?.color ?? AppColors.gray500),
-                  SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -653,7 +653,7 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
             decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
             child: Icon(icon, size: 16, color: color),
           ),
-          SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.md),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
