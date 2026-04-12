@@ -658,6 +658,10 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(description, style: AppTypography.bodySmall),
+              if (targetEmail != null && targetEmail.isNotEmpty) ...[
+                SizedBox(height: 2),
+                Text(targetEmail, style: AppTypography.caption.copyWith(color: AppColors.gray500)),
+              ],
               SizedBox(height: 2),
               Text('$date $time', style: AppTypography.caption.copyWith(color: AppColors.gray400)),
             ],

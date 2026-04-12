@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#4CAF50"/>
+  <!-- A: 왼쪽다리→꼭대기→오른쪽다리 (온전한 A) -->
+  <path d="M128,384 L224,128 L304,384" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linejoin="round" stroke-linecap="butt"/>
+  <!-- A 가로바 + L (하나의 연속 path로 꺾임 처리) -->
+  <path d="M160,272 L376,272 L376,140" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <!-- L 세로바 색상 덧칠 (가로바 위로만) -->
+  <path d="M376,258 L376,140" fill="none" stroke="#C8E6C9" stroke-width="28" stroke-linecap="butt"/>
+  <!-- V자 화살촉 -->
+  <polyline points="328,192 376,136 424,192" fill="none" stroke="#C8E6C9" stroke-width="24" stroke-linecap="butt" stroke-linejoin="miter"/>
+</svg>

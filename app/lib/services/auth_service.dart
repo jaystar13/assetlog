@@ -70,6 +70,15 @@ class AuthService {
     }
   }
 
+  /// DELETE /users/me — 회원 탈퇴
+  Future<void> withdraw() async {
+    try {
+      await _dio.delete('/users/me');
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// GET /users/me/goal — 목표 조회
   Future<Map<String, dynamic>?> getGoal() async {
     try {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 
 import '../config/env.dart';
@@ -30,6 +31,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 
       final uri = Uri.parse(result);
+
+      // 탈퇴 후 재가입 불가 안내
+      final error = uri.queryParameters['error'];
+      if (error == 'withdrawn' && mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
+            title: Text('가입할 수 없는 계정', style: AppTypography.heading3),
+            content: Text(
+              '이전에 탈퇴한 계정입니다.\n탈퇴 후 재가입은 불가합니다.',
+              style: AppTypography.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('확인', style: TextStyle(color: AppColors.emerald600)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       final accessToken = uri.queryParameters['access_token'];
       final refreshToken = uri.queryParameters['refresh_token'];
 
@@ -38,6 +63,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               accessToken: accessToken,
               refreshToken: refreshToken,
             );
+
+        // 탈퇴 철회 안내
+        final restored = uri.queryParameters['restored'];
+        if (restored == 'true' && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('탈퇴가 철회되었습니다. 다시 오신 것을 환영합니다!'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (_) {
       // 사용자가 인앱 브라우저를 닫은 경우
@@ -74,17 +110,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.emerald500,
-            borderRadius: AppRadius.lgAll,
-          ),
-          child: const Icon(
-            Icons.account_balance_wallet_rounded,
-            color: Colors.white,
-            size: 36,
+        ClipRRect(
+          borderRadius: AppRadius.lgAll,
+          child: SvgPicture.asset(
+            'assets/icons/app_logo.svg',
+            width: 72,
+            height: 72,
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -113,8 +144,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: AppSpacing.md),
         _SocialLoginButton(
           label: '카카오로 시작하기',
-          backgroundColor: const Color(0xFFFEE500),
-          textColor: const Color(0xFF191919),
+          backgroundColor: Colors.white,
+          textColor: AppColors.gray800,
+          borderColor: AppColors.gray200,
           icon: const _KakaoIcon(),
           isLoading: _isLoading,
           onPressed: () => _launchOAuth('kakao'),
@@ -122,8 +154,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: AppSpacing.md),
         _SocialLoginButton(
           label: '네이버로 시작하기',
-          backgroundColor: const Color(0xFF03C75A),
-          textColor: Colors.white,
+          backgroundColor: Colors.white,
+          textColor: AppColors.gray800,
+          borderColor: AppColors.gray200,
           icon: const _NaverIcon(),
           isLoading: _isLoading,
           onPressed: () => _launchOAuth('naver'),
@@ -194,41 +227,8 @@ class _GoogleIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 20,
-      height: 20,
-      child: CustomPaint(painter: _GoogleLogoPainter()),
-    );
+    return SvgPicture.asset('assets/icons/google_logo.svg', width: 20, height: 20);
   }
-}
-
-class _GoogleLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double s = size.width;
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), -0.5, -2.2, true, paint);
-
-    paint.color = const Color(0xFF34A853);
-    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), 1.7, -1.2, true, paint);
-
-    paint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), 2.9, -1.2, true, paint);
-
-    paint.color = const Color(0xFFEA4335);
-    canvas.drawArc(Rect.fromLTWH(0, 0, s, s), -3.58, -1.2, true, paint);
-
-    paint.color = Colors.white;
-    canvas.drawCircle(Offset(s / 2, s / 2), s * 0.3, paint);
-
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawRect(Rect.fromLTWH(s * 0.48, s * 0.38, s * 0.52, s * 0.24), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _KakaoIcon extends StatelessWidget {
@@ -245,14 +245,6 @@ class _NaverIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
-      'N',
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w900,
-        color: Colors.white,
-        height: 1,
-      ),
-    );
+    return SvgPicture.asset('assets/icons/naver_icon.svg', width: 20, height: 20);
   }
 }

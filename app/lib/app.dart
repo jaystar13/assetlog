@@ -50,6 +50,7 @@ class _AssetLogAppState extends ConsumerState<AssetLogApp> {
             accessToken: accessToken,
             refreshToken: refreshToken,
           );
+
     }
   }
 

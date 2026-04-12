@@ -9,6 +9,7 @@ import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
+import '../design_system/components/al_confirm_dialog.dart';
 import '../design_system/components/al_input.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_screen_header.dart';
@@ -109,6 +110,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               icon: Icon(LucideIcons.pencil, size: 16, color: AppColors.gray700),
               onPressed: () => _showEditProfileSheet(user),
             ),
+            SizedBox(height: AppSpacing.xxxl),
+            GestureDetector(
+              onTap: _showWithdrawConfirm,
+              child: Text(
+                '탈퇴하기',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.gray400,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -194,6 +206,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       default:
         return provider;
     }
+  }
+
+  void _showWithdrawConfirm() {
+    AlConfirmDialog.show(
+      context: context,
+      title: '탈퇴하기',
+      message: '정말 탈퇴하시겠습니까?\n\n7일 이내에 다시 로그인하면 탈퇴가 취소됩니다.\n7일 후 모든 데이터가 영구 삭제됩니다.',
+      confirmLabel: '탈퇴',
+      onConfirm: () async {
+        try {
+          await ref.read(authServiceProvider).withdraw();
+          await ref.read(authNotifierProvider.notifier).logout();
+        } catch (e) {
+          if (mounted) showErrorSnackBar(context, '탈퇴 실패: $e');
+        }
+      },
+    );
   }
 
   void _showEditProfileSheet(Map<String, dynamic>? user) {

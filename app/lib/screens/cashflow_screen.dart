@@ -241,7 +241,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               title: Text('나', style: AppTypography.bodyLarge),
               trailing: _selectedGroupId == null ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
               onTap: () {
-                setState(() { _selectedGroupId = null; _selectedGroupName = '나'; });
+                setState(() { _selectedGroupId = null; _selectedGroupName = '나'; _sharedTransactions = []; _lastLoadedGroupKey = null; });
                 Navigator.pop(ctx);
               },
             ),
@@ -256,8 +256,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                 title: Text(displayName, style: AppTypography.bodyLarge),
                 trailing: isSelected ? Icon(LucideIcons.check, size: 18, color: AppColors.emerald600) : null,
                 onTap: () {
-                  setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; });
+                  setState(() { _selectedGroupId = gId; _selectedGroupName = displayName; _lastLoadedGroupKey = null; });
                   Navigator.pop(ctx);
+                  _loadSharedTransactions();
                 },
               );
             }),
@@ -406,7 +407,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                         ],
                       ),
                       SizedBox(height: AppSpacing.md),
-                      if (filtered.isEmpty)
+                      if (filtered.isEmpty && !(_isGroupMode && _sharedTransactions.isNotEmpty))
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
                           child: Center(
@@ -1064,7 +1065,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         // 내 거래와 중복 제거
         if (myTransactions.any((t) => t.id == txId)) continue;
         try {
-          final tx = Transaction.fromMap(raw);
+          // subCategory가 snake_case일 수 있으므로 fallback 처리
+          final normalized = Map<String, dynamic>.from(raw);
+          if (!normalized.containsKey('subCategory') && normalized.containsKey('sub_category')) {
+            normalized['subCategory'] = normalized['sub_category'];
+          }
+          final tx = Transaction.fromMap(normalized);
           transactions.add(tx);
           final owner = raw['user'] as Map<String, dynamic>? ?? {};
           _sharedTxOwners[txId] = (
