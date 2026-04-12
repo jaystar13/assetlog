@@ -77,11 +77,14 @@ export class ShareGroupsService {
       throw new BadRequestException('자기 자신에게는 초대를 보낼 수 없습니다.');
     }
 
-    // 이미 멤버인지 확인
+    // 대상 사용자 확인
     const targetUser = await this.prisma.user.findUnique({
       where: { email: dto.toEmail.toLowerCase() },
     });
     if (targetUser) {
+      // 탈퇴한 사용자 초대 차단
+      if (targetUser.deletedAt) throw new BadRequestException('탈퇴한 사용자에게는 초대를 보낼 수 없습니다.');
+      // 이미 멤버인지 확인
       const existing = await this.prisma.shareGroupMember.findUnique({
         where: { groupId_userId: { groupId, userId: targetUser.id } },
       });
@@ -195,20 +198,20 @@ export class ShareGroupsService {
   }
 
   async acceptInvitation(userId: string, userEmail: string, invitationId: string) {
-    const invitation = await this.prisma.groupInvitation.findUnique({ where: { id: invitationId } });
-    if (!invitation) throw new NotFoundException('초대를 찾을 수 없습니다.');
-    if (invitation.toEmail.toLowerCase() !== userEmail.toLowerCase()) {
-      throw new ForbiddenException('본인에게 온 초대만 수락할 수 있습니다.');
-    }
-    if (invitation.status !== 'pending') {
-      throw new BadRequestException('대기 중인 초대만 수락할 수 있습니다.');
-    }
-    if (new Date() > invitation.expiresAt) {
-      await this.prisma.groupInvitation.update({ where: { id: invitationId }, data: { status: 'expired' } });
-      throw new BadRequestException('만료된 초대입니다.');
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
+      const invitation = await tx.groupInvitation.findUnique({ where: { id: invitationId } });
+      if (!invitation) throw new NotFoundException('초대를 찾을 수 없습니다.');
+      if (invitation.toEmail.toLowerCase() !== userEmail.toLowerCase()) {
+        throw new ForbiddenException('본인에게 온 초대만 수락할 수 있습니다.');
+      }
+      if (invitation.status !== 'pending') {
+        throw new BadRequestException('대기 중인 초대만 수락할 수 있습니다.');
+      }
+      if (new Date() > invitation.expiresAt) {
+        await tx.groupInvitation.update({ where: { id: invitationId }, data: { status: 'expired' } });
+        throw new BadRequestException('만료된 초대입니다.');
+      }
+
       await tx.groupInvitation.update({ where: { id: invitationId }, data: { status: 'accepted' } });
       return tx.shareGroupMember.create({
         data: {
@@ -226,11 +229,11 @@ export class ShareGroupsService {
     });
 
     await this.logActivity({
-      groupId: invitation.groupId,
+      groupId: result.group.id,
       actorUserId: userId,
       action: 'accepted',
       targetEmail: userEmail,
-      targetNickname: invitation.nickname ?? null,
+      targetNickname: result.nickname ?? null,
     });
 
     return result;
@@ -267,6 +270,19 @@ export class ShareGroupsService {
   async shareItems(userId: string, groupId: string, dto: ShareItemsDto) {
     await this.assertMember(userId, groupId);
 
+    // 아이템 소유권 검증
+    const txIds = dto.items.filter((i) => i.itemType === 'transaction').map((i) => i.itemId);
+    const assetIds = dto.items.filter((i) => i.itemType === 'asset').map((i) => i.itemId);
+
+    if (txIds.length > 0) {
+      const owned = await this.prisma.transaction.findMany({ where: { id: { in: txIds }, userId } });
+      if (owned.length !== txIds.length) throw new ForbiddenException('본인의 거래만 공유할 수 있습니다.');
+    }
+    if (assetIds.length > 0) {
+      const owned = await this.prisma.asset.findMany({ where: { id: { in: assetIds }, userId } });
+      if (owned.length !== assetIds.length) throw new ForbiddenException('본인의 자산만 공유할 수 있습니다.');
+    }
+
     const data = dto.items.map((item) => ({
       groupId,
       ownerUserId: userId,
@@ -274,7 +290,6 @@ export class ShareGroupsService {
       itemId: item.itemId,
     }));
 
-    // skipDuplicates로 이미 공유된 항목은 무시
     await this.prisma.sharedItem.createMany({ data, skipDuplicates: true });
 
     return { shared: data.length };
@@ -396,8 +411,8 @@ export class ShareGroupsService {
     await this.prisma.groupActivityLog.create({ data: params });
   }
 
-  findActivityLogs(userId: string, groupId: string) {
-    // 멤버 확인은 컨트롤러에서 처리
+  async findActivityLogs(userId: string, groupId: string) {
+    await this.assertMember(userId, groupId);
     return this.prisma.groupActivityLog.findMany({
       where: { groupId },
       include: { actor: { select: USER_SELECT } },

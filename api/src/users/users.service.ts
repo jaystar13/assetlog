@@ -15,7 +15,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user?.deletedAt) return null;
+    return user;
   }
 
   async update(id: string, dto: UpdateUserDto) {

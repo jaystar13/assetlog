@@ -102,9 +102,14 @@ export class AuthService {
 
     if (!matched) throw new UnauthorizedException('Invalid refresh token');
 
-    // Rotation: 기존 토큰 삭제 후 새 토큰 발급
-    await this.prisma.refreshToken.delete({ where: { id: matched.id } });
-    return this.issueTokens(payload.sub, payload.email);
+    // Rotation: 트랜잭션으로 기존 토큰 삭제 + 새 토큰 발급
+    try {
+      await this.prisma.refreshToken.delete({ where: { id: matched.id } });
+      return await this.issueTokens(payload.sub, payload.email);
+    } catch (e) {
+      // 새 토큰 발급 실패 시에도 기존 토큰은 삭제됨 → 재로그인 필요
+      throw new UnauthorizedException('토큰 갱신 실패, 다시 로그인해 주세요.');
+    }
   }
 
   // ───────────────────────────── logout ─────────────────────────────

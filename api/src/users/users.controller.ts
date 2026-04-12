@@ -42,7 +42,6 @@ export class UsersController {
   @Put('me/goal')
   @ApiOperation({ summary: '내 자산 목표 설정/수정' })
   upsertGoal(@CurrentUser('id') userId: string, @Body() dto: UpsertGoalDto) {
-    console.log('[Goal] upsertGoal dto:', JSON.stringify(dto));
     return this.usersService.upsertGoal(userId, dto);
   }
 }
