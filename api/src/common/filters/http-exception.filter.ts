@@ -18,7 +18,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const res = exception.getResponse();
       console.error(`[${exception.getStatus()}]`, typeof res === 'string' ? res : JSON.stringify(res));
     } else {
-      console.error('Unhandled exception:', exception);
+      console.error('Unhandled exception:', exception instanceof Error ? exception.stack : exception);
     }
 
     const status =

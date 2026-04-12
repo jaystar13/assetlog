@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { WITHDRAWAL_GRACE_DAYS } from '../common/constants/app.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpsertGoalDto } from './dto/upsert-goal.dto';
@@ -34,7 +35,7 @@ export class UsersService {
     const user = await this.findById(id);
 
     const purgeAfter = new Date();
-    purgeAfter.setDate(purgeAfter.getDate() + 7);
+    purgeAfter.setDate(purgeAfter.getDate() + WITHDRAWAL_GRACE_DAYS);
 
     const emailHash = createHash('sha256').update(user.email.toLowerCase()).digest('hex');
 

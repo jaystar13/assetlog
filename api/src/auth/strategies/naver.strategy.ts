@@ -32,7 +32,10 @@ export class NaverStrategy extends PassportStrategy(Strategy, 'naver') {
     profile: NaverProfile,
     done: (error: Error | null, user?: unknown) => void,
   ) {
-    const email = profile.email ?? `${profile.id}@naver.local`;
+    const email = profile.email;
+    if (!email) {
+      return done(new Error('네이버 계정에 이메일이 등록되어 있지 않습니다. 이메일 동의 후 다시 시도해 주세요.'));
+    }
     const name = profile.name ?? '네이버 사용자';
 
     const user = await this.authService.findOrCreateUser({

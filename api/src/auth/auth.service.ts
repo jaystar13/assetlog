@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { WITHDRAWAL_GRACE_DAYS } from '../common/constants/app.constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -32,7 +33,7 @@ export class AuthService {
       // 탈퇴 유예 기간 중 재로그인 → 자동 복구
       if (existing.deletedAt) {
         const daysSinceDelete = (Date.now() - existing.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSinceDelete <= 7) {
+        if (daysSinceDelete <= WITHDRAWAL_GRACE_DAYS) {
           await this.prisma.user.update({
             where: { id: existing.id },
             data: { deletedAt: null },
@@ -47,7 +48,7 @@ export class AuthService {
 
     return this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: dto.email.toLowerCase(),
         name: dto.name,
         avatar: dto.avatar ?? null,
         provider: dto.provider,
@@ -76,7 +77,9 @@ export class AuthService {
     );
 
     const hash = await bcrypt.hash(rawRefresh, 10);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7일
+    const refreshExpirationStr = this.configService.get<string>('JWT_REFRESH_EXPIRATION') ?? '7d';
+    const refreshDays = parseInt(refreshExpirationStr) || 7;
+    const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
 
     await this.prisma.refreshToken.create({
       data: { userId, token: hash, expiresAt },

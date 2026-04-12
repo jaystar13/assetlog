@@ -34,7 +34,11 @@ export class TransformInterceptor<T>
 
   private serializeBigInt(obj: unknown): T {
     if (obj === null || obj === undefined) return obj as T;
-    if (typeof obj === 'bigint') return Number(obj) as T;
+    if (typeof obj === 'bigint') {
+      return (obj <= Number.MAX_SAFE_INTEGER && obj >= Number.MIN_SAFE_INTEGER
+        ? Number(obj)
+        : obj.toString()) as T;
+    }
     if (obj instanceof Date) return obj.toISOString() as T;
     if (Array.isArray(obj)) return obj.map((item) => this.serializeBigInt(item)) as T;
     if (typeof obj === 'object') {

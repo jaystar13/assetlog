@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { INVITATION_EXPIRY_DAYS } from '../common/constants/app.constants';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { InviteToGroupDto } from './dto/invite-to-group.dto';
 import { ShareItemsDto } from './dto/share-items.dto';
@@ -98,7 +99,7 @@ export class ShareGroupsService {
     if (pendingInvite) throw new BadRequestException('이미 대기 중인 초대가 있습니다.');
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);
 
     const invitation = await this.prisma.groupInvitation.create({
       data: {

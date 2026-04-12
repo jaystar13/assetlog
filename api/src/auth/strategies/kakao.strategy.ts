@@ -38,7 +38,10 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
     done: (error: Error | null, user?: unknown) => void,
   ) {
     const kakaoAccount = profile._json?.kakao_account;
-    const email = kakaoAccount?.email ?? `${profile.id}@kakao.local`;
+    const email = kakaoAccount?.email;
+    if (!email) {
+      return done(new Error('카카오 계정에 이메일이 등록되어 있지 않습니다. 이메일 동의 후 다시 시도해 주세요.'));
+    }
     const name = kakaoAccount?.profile?.nickname ?? '카카오 사용자';
     const avatar = kakaoAccount?.profile?.profile_image_url;
 
