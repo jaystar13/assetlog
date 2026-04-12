@@ -7,6 +7,7 @@ import {
   Body,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -23,7 +24,14 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiBearerAuth()
 @Controller('import')
 export class ImportController {
-  constructor(private importService: ImportService) {}
+  private maxFileSize: number;
+
+  constructor(
+    private importService: ImportService,
+    private configService: ConfigService,
+  ) {
+    this.maxFileSize = parseInt(this.configService.get<string>('MAX_UPLOAD_SIZE_MB') ?? '5') * 1024 * 1024;
+  }
 
   @Get('card-companies')
   @ApiOperation({ summary: '파일 임포트 지원 카드사 목록' })
@@ -65,6 +73,10 @@ export class ImportController {
     @Body('targetMonth') targetMonth: string,
   ) {
     if (!file) throw new BadRequestException('파일을 업로드해주세요.');
+    if (file.size > this.maxFileSize) {
+      const maxMb = Math.round(this.maxFileSize / 1024 / 1024);
+      throw new BadRequestException(`파일 크기가 ${maxMb}MB를 초과합니다.`);
+    }
     if (!cardCompany) throw new BadRequestException('카드사를 지정해주세요.');
     if (!targetMonth || !/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) {
       throw new BadRequestException('귀속월을 YYYY-MM 형식으로 입력해주세요.');

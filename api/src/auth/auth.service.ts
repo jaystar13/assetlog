@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { WITHDRAWAL_GRACE_DAYS } from '../common/constants/app.constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -17,11 +18,39 @@ export interface FindOrCreateUserDto {
 
 @Injectable()
 export class AuthService {
+  // 일회용 인증 코드 저장소 (메모리)
+  private authCodes = new Map<string, { userId: string; email: string; expiresAt: number; restored?: boolean; withdrawn?: boolean }>();
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
+
+  // ───────────────────────────── Auth Code ─────────────────────────────
+
+  createAuthCode(params: { userId: string; email: string; restored?: boolean; withdrawn?: boolean }): string {
+    const code = randomUUID();
+    this.authCodes.set(code, {
+      ...params,
+      expiresAt: Date.now() + 60 * 1000, // 1분 만료
+    });
+    return code;
+  }
+
+  async exchangeAuthCode(code: string) {
+    const entry = this.authCodes.get(code);
+    if (!entry) throw new BadRequestException('유효하지 않은 인증 코드입니다.');
+
+    // 즉시 삭제 (1회 사용)
+    this.authCodes.delete(code);
+
+    if (entry.expiresAt < Date.now()) throw new BadRequestException('만료된 인증 코드입니다.');
+    if (entry.withdrawn) throw new BadRequestException('탈퇴 처리된 계정입니다.');
+
+    const tokens = await this.issueTokens(entry.userId, entry.email);
+    return { ...tokens, restored: entry.restored ?? false };
+  }
 
   // ───────────────────────────── findOrCreate ─────────────────────────────
 
@@ -59,7 +88,8 @@ export class AuthService {
 
   // ───────────────────────────── token issuance ─────────────────────────────
 
-  async issueTokens(userId: string, email: string) {
+  async issueTokens(userId: string, email: string, tx?: Parameters<Parameters<typeof this.prisma.$transaction>[0]>[0]) {
+    const db = tx ?? this.prisma;
     const payload: JwtPayload = { sub: userId, email };
 
     const accessToken = this.jwtService.sign(payload as unknown as Record<string, unknown>, {
@@ -67,7 +97,6 @@ export class AuthService {
       expiresIn: (this.configService.get<string>('JWT_EXPIRATION') ?? '15m') as never,
     });
 
-    // Refresh token: DB에 hash 저장 후 raw 반환
     const rawRefresh = this.jwtService.sign(
       { sub: userId } as unknown as Record<string, unknown>,
       {
@@ -77,11 +106,11 @@ export class AuthService {
     );
 
     const hash = await bcrypt.hash(rawRefresh, 10);
-    const refreshExpirationStr = this.configService.get<string>('JWT_REFRESH_EXPIRATION') ?? '7d';
-    const refreshDays = parseInt(refreshExpirationStr) || 7;
-    const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + this.parseExpirationToMs(
+      this.configService.get<string>('JWT_REFRESH_EXPIRATION') ?? '7d',
+    ));
 
-    await this.prisma.refreshToken.create({
+    await db.refreshToken.create({
       data: { userId, token: hash, expiresAt },
     });
 
@@ -105,14 +134,11 @@ export class AuthService {
 
     if (!matched) throw new UnauthorizedException('Invalid refresh token');
 
-    // Rotation: 트랜잭션으로 기존 토큰 삭제 + 새 토큰 발급
-    try {
-      await this.prisma.refreshToken.delete({ where: { id: matched.id } });
-      return await this.issueTokens(payload.sub, payload.email);
-    } catch (e) {
-      // 새 토큰 발급 실패 시에도 기존 토큰은 삭제됨 → 재로그인 필요
-      throw new UnauthorizedException('토큰 갱신 실패, 다시 로그인해 주세요.');
-    }
+    // Rotation: 트랜잭션으로 기존 토큰 삭제 + 새 토큰 발급 (원자적 처리)
+    return this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.delete({ where: { id: matched!.id } });
+      return this.issueTokens(payload.sub, payload.email, tx);
+    });
   }
 
   // ───────────────────────────── logout ─────────────────────────────
@@ -135,5 +161,20 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({
       where: { expiresAt: { lt: new Date() } },
     });
+  }
+
+  /** '7d', '24h', '30m', '2w' 등 문자열을 밀리초로 변환 */
+  private parseExpirationToMs(str: string): number {
+    const match = str.match(/^(\d+)(s|m|h|d|w)$/);
+    if (!match) return 7 * 24 * 60 * 60 * 1000; // fallback 7일
+    const value = parseInt(match[1]);
+    switch (match[2]) {
+      case 's': return value * 1000;
+      case 'm': return value * 60 * 1000;
+      case 'h': return value * 60 * 60 * 1000;
+      case 'd': return value * 24 * 60 * 60 * 1000;
+      case 'w': return value * 7 * 24 * 60 * 60 * 1000;
+      default: return 7 * 24 * 60 * 60 * 1000;
+    }
   }
 }

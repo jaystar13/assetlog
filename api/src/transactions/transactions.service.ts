@@ -24,8 +24,6 @@ export class TransactionsService {
 
     if (query.month) {
       const [yyyy, mm] = query.month.split('-').map(Number);
-      // targetMonth 있으면 귀속월 기준, 없으면 거래일자 기준으로 조회
-      where.targetMonth = query.month;
       // targetMonth가 null인 수동 입력 거래도 함께 조회
       return this.prisma.transaction.findMany({
         where: {

@@ -39,24 +39,26 @@ export class UsersService {
 
     const emailHash = createHash('sha256').update(user.email.toLowerCase()).digest('hex');
 
-    // 탈퇴 이력 기록
-    await this.prisma.withdrawalLog.create({
-      data: {
-        emailHash,
-        provider: user.provider,
-        reason: reason ?? null,
-        purgeAfter,
-      },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      // 탈퇴 이력 기록
+      await tx.withdrawalLog.create({
+        data: {
+          emailHash,
+          provider: user.provider,
+          reason: reason ?? null,
+          purgeAfter,
+        },
+      });
 
-    // soft delete
-    await this.prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+      // soft delete
+      await tx.user.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
 
-    // 리프레시 토큰 전부 삭제 (로그인 차단)
-    await this.prisma.refreshToken.deleteMany({ where: { userId: id } });
+      // 리프레시 토큰 전부 삭제 (로그인 차단)
+      await tx.refreshToken.deleteMany({ where: { userId: id } });
+    });
   }
 
   async restoreAccount(id: string) {

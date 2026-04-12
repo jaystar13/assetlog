@@ -55,24 +55,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
-      final accessToken = uri.queryParameters['access_token'];
-      final refreshToken = uri.queryParameters['refresh_token'];
+      // 일회용 코드로 토큰 교환
+      final code = uri.queryParameters['code'];
+      if (code != null) {
+        final tokens = await ref.read(authServiceProvider).exchangeAuthCode(code);
+        final accessToken = tokens['accessToken'] as String?;
+        final refreshToken = tokens['refreshToken'] as String?;
+        final restored = tokens['restored'] as bool? ?? false;
 
-      if (accessToken != null && refreshToken != null) {
-        await ref.read(authNotifierProvider.notifier).handleAuthCallback(
-              accessToken: accessToken,
-              refreshToken: refreshToken,
+        if (accessToken != null && refreshToken != null) {
+          await ref.read(authNotifierProvider.notifier).handleAuthCallback(
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+              );
+
+          if (restored && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('탈퇴가 철회되었습니다. 다시 오신 것을 환영합니다!'),
+                duration: Duration(seconds: 3),
+              ),
             );
-
-        // 탈퇴 철회 안내
-        final restored = uri.queryParameters['restored'];
-        if (restored == 'true' && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('탈퇴가 철회되었습니다. 다시 오신 것을 환영합니다!'),
-              duration: Duration(seconds: 3),
-            ),
-          );
+          }
         }
       }
     } catch (_) {

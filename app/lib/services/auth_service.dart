@@ -29,6 +29,16 @@ class AuthService {
     }
   }
 
+  /// POST /auth/exchange — 일회용 코드 → 토큰 교환
+  Future<Map<String, dynamic>> exchangeAuthCode(String code) async {
+    try {
+      final response = await _dio.post('/auth/exchange', data: {'code': code});
+      return _unwrap(response);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// POST /auth/logout — 로그아웃
   Future<void> logout(String refreshToken) async {
     try {

@@ -87,6 +87,18 @@ export class AuthController {
     return this.handleOAuthCallback(req, res);
   }
 
+  // ─────────────────────── Auth Code Exchange ───────────────────────
+
+  @Public()
+  @Post('exchange')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '일회용 인증 코드 → 토큰 교환' })
+  @ApiBody({ schema: { properties: { code: { type: 'string' } }, required: ['code'] } })
+  @ApiResponse({ status: 200, type: TokenResponseDto })
+  async exchange(@Body('code') code: string) {
+    return this.authService.exchangeAuthCode(code);
+  }
+
   // ─────────────────────── Token Refresh ───────────────────────
 
   @Public()
@@ -143,11 +155,12 @@ export class AuthController {
       return;
     }
 
-    const tokens = await this.authService.issueTokens(user.id, user.email);
-    let redirectUrl = `${deepLink}?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`;
-    if (user._restored) {
-      redirectUrl += '&restored=true';
-    }
-    res.redirect(redirectUrl);
+    // 일회용 코드 생성 → 딥링크에 코드만 전달
+    const code = this.authService.createAuthCode({
+      userId: user.id,
+      email: user.email,
+      restored: user._restored,
+    });
+    res.redirect(`${deepLink}?code=${code}`);
   }
 }
