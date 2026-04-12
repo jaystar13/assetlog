@@ -15,8 +15,9 @@ model User {
   avatar     String?
   provider   String   // "google" | "kakao"
   providerId String
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
 
   assets              Asset[]
   transactions        Transaction[]
@@ -213,6 +214,20 @@ model GroupActivityLog {
   @@index([groupId])
   @@index([actorUserId])
   @@map("group_activity_logs")
+}
+
+// ─── WithdrawalLog (탈퇴 이력) ───────────────────────────────────────────────
+
+model WithdrawalLog {
+  id            String   @id @default(uuid())
+  emailHash     String   @map("email_hash") // SHA-256 해시
+  provider      String                      // "google" | "kakao" | "naver"
+  reason        String?                     // 탈퇴 사유
+  withdrawnAt   DateTime @default(now()) @map("withdrawn_at")
+  purgeAfter    DateTime @map("purge_after") // 완전 삭제 예정일 (7일 후)
+
+  @@index([emailHash])
+  @@map("withdrawal_logs")
 }
 
 // ─── Seed Tables ─────────────────────────────────────────────────────────────

@@ -28,7 +28,22 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({
       where: { provider_providerId: { provider: dto.provider, providerId: dto.providerId } },
     });
-    if (existing) return existing;
+    if (existing) {
+      // 탈퇴 유예 기간 중 재로그인 → 자동 복구
+      if (existing.deletedAt) {
+        const daysSinceDelete = (Date.now() - existing.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceDelete <= 7) {
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { deletedAt: null },
+          });
+          return { ...existing, deletedAt: null, _restored: true };
+        }
+        // 7일 초과 → 재가입 불가
+        return { ...existing, _withdrawn: true };
+      }
+      return existing;
+    }
 
     return this.prisma.user.create({
       data: {

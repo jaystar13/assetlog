@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpsertGoalDto } from './dto/upsert-goal.dto';
@@ -27,8 +28,39 @@ export class UsersService {
     });
   }
 
-  async remove(id: string) {
-    await this.prisma.user.delete({ where: { id } });
+  async withdraw(id: string, reason?: string) {
+    const user = await this.findById(id);
+
+    const purgeAfter = new Date();
+    purgeAfter.setDate(purgeAfter.getDate() + 7);
+
+    const emailHash = createHash('sha256').update(user.email.toLowerCase()).digest('hex');
+
+    // 탈퇴 이력 기록
+    await this.prisma.withdrawalLog.create({
+      data: {
+        emailHash,
+        provider: user.provider,
+        reason: reason ?? null,
+        purgeAfter,
+      },
+    });
+
+    // soft delete
+    await this.prisma.user.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    // 리프레시 토큰 전부 삭제 (로그인 차단)
+    await this.prisma.refreshToken.deleteMany({ where: { userId: id } });
+  }
+
+  async restoreAccount(id: string) {
+    await this.prisma.user.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
   }
 
   // ─────────────────────── Financial Goal ───────────────────────

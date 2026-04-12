@@ -134,10 +134,20 @@ export class AuthController {
   // ─────────────────────── Private helper ───────────────────────
 
   private async handleOAuthCallback(req: Request, res: Response) {
-    const user = req.user as { id: string; email: string };
-    const tokens = await this.authService.issueTokens(user.id, user.email);
+    const user = req.user as { id: string; email: string; _restored?: boolean; _withdrawn?: boolean };
     const deepLink = this.configService.get<string>('APP_DEEP_LINK')!;
-    const redirectUrl = `${deepLink}?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`;
+
+    // 탈퇴 후 7일 초과 → 재가입 불가 안내
+    if (user._withdrawn) {
+      res.redirect(`${deepLink}?error=withdrawn`);
+      return;
+    }
+
+    const tokens = await this.authService.issueTokens(user.id, user.email);
+    let redirectUrl = `${deepLink}?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`;
+    if (user._restored) {
+      redirectUrl += '&restored=true';
+    }
     res.redirect(redirectUrl);
   }
 }
