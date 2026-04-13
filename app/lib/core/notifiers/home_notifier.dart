@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/daily_quote.dart';
 import '../../models/enums.dart';
 import '../../models/transaction.dart';
 import '../../utils/date_format.dart';
@@ -48,6 +49,7 @@ class HomeDashboard {
   final int monthlyIncome;
   final int monthlyExpense;
   final FinancialGoal? goal;
+  final DailyQuote? dailyQuote;
   final List<SharedGroupSummary> sharedGroups;
 
   const HomeDashboard({
@@ -58,6 +60,7 @@ class HomeDashboard {
     required this.monthlyIncome,
     required this.monthlyExpense,
     this.goal,
+    this.dailyQuote,
     this.sharedGroups = const [],
   });
 
@@ -77,6 +80,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final txService = ref.watch(transactionServiceProvider);
     final authService = ref.watch(authServiceProvider);
     final groupService = ref.watch(shareGroupServiceProvider);
+    final quoteService = ref.watch(quoteServiceProvider);
 
     final now = DateTime.now();
     final currentMonth = toMonthKey(now);
@@ -92,6 +96,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
       txService.getTransactions(month: currentMonth).catchError((_) => <Transaction>[]),
       authService.getGoal().catchError((_) => null),
       groupService.getMyGroups().catchError((_) => <Map<String, dynamic>>[]),
+      quoteService.getDailyQuote().catchError((_) => null),
     ]);
 
     final currentAssets = futures[0] as List<Map<String, dynamic>>;
@@ -99,6 +104,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
     final transactions = futures[2] as List<Transaction>;
     final goalData = futures[3] as Map<String, dynamic>?;
     final groups = futures[4] as List<Map<String, dynamic>>;
+    final quote = futures[5] as DailyQuote?;
 
     // 당월 자산 합계
     final currentTotals = _calcAssetTotals(currentAssets);
@@ -138,6 +144,7 @@ class HomeNotifier extends AutoDisposeAsyncNotifier<HomeDashboard> {
       monthlyIncome: income,
       monthlyExpense: expense,
       goal: goalData != null ? FinancialGoal.fromJson(goalData) : null,
+      dailyQuote: quote,
       sharedGroups: groupSummaries,
     );
   }

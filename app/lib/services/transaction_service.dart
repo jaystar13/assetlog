@@ -83,6 +83,20 @@ class TransactionService with ApiResponseUnwrapper {
     }
   }
 
+  /// POST /transactions/batch-delete — 일괄 삭제
+  Future<int> batchDeleteTransactions(List<String> ids) async {
+    try {
+      final response = await _dio.post(
+        '/transactions/batch-delete',
+        data: {'ids': ids},
+      );
+      final data = unwrap(response);
+      return data['deleted'] as int;
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// POST /import/transactions — 카드 명세서 일괄 업로드
   Future<Map<String, dynamic>> importTransactions({
     required String cardCompany,

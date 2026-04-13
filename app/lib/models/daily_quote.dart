@@ -3,4 +3,9 @@ class DailyQuote {
   final String author;
 
   const DailyQuote({required this.text, required this.author});
+
+  factory DailyQuote.fromJson(Map<String, dynamic> json) => DailyQuote(
+        text: json['text'] as String,
+        author: json['author'] as String,
+      );
 }

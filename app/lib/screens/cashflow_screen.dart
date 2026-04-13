@@ -105,18 +105,22 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       title: '일괄 삭제',
       message: '선택한 $count건의 거래를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
       onConfirm: () async {
-        final notifier = ref.read(
-          transactionNotifierProvider(_monthKey).notifier,
-        );
-        for (final id in _selectedIds) {
-          await notifier.deleteTransaction(id);
-        }
-        if (mounted) {
-          setState(() {
-            _isSelectMode = false;
-            _selectedIds.clear();
-          });
-          showSuccessSnackBar(context, '$count건의 거래가 삭제되었습니다');
+        try {
+          final notifier = ref.read(
+            transactionNotifierProvider(_monthKey).notifier,
+          );
+          final deleted = await notifier.batchDeleteTransactions(
+            _selectedIds.toList(),
+          );
+          if (mounted) {
+            setState(() {
+              _isSelectMode = false;
+              _selectedIds.clear();
+            });
+            showSuccessSnackBar(context, '$deleted건의 거래가 삭제되었습니다');
+          }
+        } catch (e) {
+          if (mounted) showErrorSnackBar(context, '삭제 실패: $e');
         }
       },
     );

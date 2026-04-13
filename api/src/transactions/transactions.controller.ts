@@ -15,6 +15,7 @@ import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { QueryTransactionDto } from './dto/query-transaction.dto';
+import { BatchDeleteTransactionDto } from './dto/batch-delete-transaction.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Transactions')
@@ -39,6 +40,16 @@ export class TransactionsController {
     @Body() dto: CreateTransactionDto,
   ) {
     return this.transactionsService.create(userId, dto);
+  }
+
+  @Post('batch-delete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '수입/지출 일괄 삭제' })
+  batchRemove(
+    @CurrentUser('id') userId: string,
+    @Body() dto: BatchDeleteTransactionDto,
+  ) {
+    return this.transactionsService.batchRemove(userId, dto.ids);
   }
 
   @Patch(':id')

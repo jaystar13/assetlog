@@ -49,6 +49,12 @@ class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transactio
     _invalidateAll();
   }
 
+  Future<int> batchDeleteTransactions(List<String> ids) async {
+    final deleted = await _service.batchDeleteTransactions(ids);
+    _invalidateAll();
+    return deleted;
+  }
+
   void _invalidateAll() {
     ref.invalidateSelf();
     ref.invalidate(homeNotifierProvider);

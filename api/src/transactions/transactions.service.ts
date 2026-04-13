@@ -117,6 +117,39 @@ export class TransactionsService {
     await this.prisma.transaction.delete({ where: { id } });
   }
 
+  // ─────────────────────── 일괄 삭제 ───────────────────────
+
+  async batchRemove(userId: string, ids: string[]) {
+    // 소유권 확인: 요청한 ID가 모두 해당 사용자의 거래인지 검증
+    const transactions = await this.prisma.transaction.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, userId: true },
+    });
+
+    const foundIds = transactions.map((t) => t.id);
+    const notFound = ids.filter((id) => !foundIds.includes(id));
+    if (notFound.length > 0) {
+      throw new NotFoundException(`거래 내역을 찾을 수 없습니다: ${notFound.join(', ')}`);
+    }
+
+    const unauthorized = transactions.filter((t) => t.userId !== userId);
+    if (unauthorized.length > 0) {
+      throw new ForbiddenException('접근 권한이 없는 거래가 포함되어 있습니다.');
+    }
+
+    // 트랜잭션으로 일괄 삭제 (공유 항목 → 거래 순서)
+    await this.prisma.$transaction([
+      this.prisma.sharedItem.deleteMany({
+        where: { itemType: 'transaction', itemId: { in: ids } },
+      }),
+      this.prisma.transaction.deleteMany({
+        where: { id: { in: ids } },
+      }),
+    ]);
+
+    return { deleted: ids.length };
+  }
+
   // ─────────────────────── Private helper ───────────────────────
 
   private async findOneOwned(userId: string, id: string) {

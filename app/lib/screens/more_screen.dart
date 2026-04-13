@@ -8,9 +8,7 @@ import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
-import '../design_system/components/al_button.dart';
 import '../design_system/components/al_avatar.dart';
-import '../design_system/components/al_confirm_dialog.dart';
 import '../design_system/components/al_screen_header.dart';
 
 class MoreScreen extends ConsumerWidget {
@@ -106,26 +104,6 @@ class MoreScreen extends ConsumerWidget {
                   label: '개인정보처리방침',
                 ),
               ]),
-              const SizedBox(height: AppSpacing.sectionGap),
-
-              // 로그아웃
-              AlButton(
-                label: '로그아웃',
-                variant: AlButtonVariant.danger,
-                icon: Icon(LucideIcons.logOut, size: 18, color: AppColors.red600),
-                onPressed: () {
-                  AlConfirmDialog.show(
-                    context: context,
-                    title: '로그아웃',
-                    message: '정말 로그아웃하시겠습니까?',
-                    confirmLabel: '로그아웃',
-                    isDestructive: true,
-                    onConfirm: () {
-                      ref.read(authNotifierProvider.notifier).logout();
-                    },
-                  );
-                },
-              ),
             ],
           ),
         ),

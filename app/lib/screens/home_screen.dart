@@ -16,7 +16,6 @@ import '../design_system/components/al_section_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/home_notifier.dart';
 import '../core/providers.dart';
-import '../repositories/repositories.dart';
 import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/snackbar_helper.dart';
@@ -35,8 +34,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late final Animation<double> _goalAnim;
 
   final _prefs = UserPreferences();
-  final _repo = HomeRepository();
-  late final List<DailyQuote> _quotes;
 
   // Goal setting controllers
   final _goalStartController = TextEditingController();
@@ -46,7 +43,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _quotes = _repo.getQuotes();
     _prefs.addListener(_onPrefsChanged);
 
     // 목표 달성률 애니메이션
@@ -77,15 +73,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mounted) setState(() {});
   }
 
-  DailyQuote get _todayQuote {
-    final dayOfYear = DateTime.now()
-        .difference(DateTime(DateTime.now().year, 1, 1))
-        .inDays;
-    return _quotes[dayOfYear % _quotes.length];
-  }
-
-  Widget _buildDailyQuote() {
-    final quote = _todayQuote;
+  Widget _buildDailyQuote(DailyQuote? quote) {
+    if (quote == null) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(AppSpacing.lg),
@@ -247,7 +236,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: AppSpacing.lg),
-                      _buildDailyQuote(),
+                      _buildDailyQuote(dashboard.dailyQuote),
                       const SizedBox(height: AppSpacing.sectionGap),
                       _buildGoalVisualizerCard(dashboard),
                       const SizedBox(height: AppSpacing.sectionGap),

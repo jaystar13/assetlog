@@ -12,6 +12,7 @@ import '../design_system/components/al_button.dart';
 import '../design_system/components/al_avatar.dart';
 import '../design_system/components/al_bottom_sheet.dart';
 import '../design_system/components/al_input.dart';
+import '../design_system/components/al_confirm_dialog.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/enums.dart';
 import '../core/providers.dart';
@@ -214,83 +215,129 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
     final members =
         (group['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final itemCount = group['_count']?['sharedItems'] ?? 0;
+    final groupId = group['id'] as String;
+    final groupName = group['name'] as String;
 
-    return GestureDetector(
+    // 내가 admin인지 확인
+    final authState = ref.read(authNotifierProvider);
+    final myUserId = authState.user?['id'] as String? ?? '';
+    final myMember = members.where((m) {
+      final user = m['user'] as Map<String, dynamic>? ?? {};
+      return user['id'] == myUserId;
+    });
+    final isAdmin = myMember.isNotEmpty &&
+        (myMember.first['role'] as String? ?? '') == 'admin';
+
+    final card = GestureDetector(
       onTap: () async {
-        await context.push('/more/groups/${group['id']}');
+        await context.push('/more/groups/$groupId');
         _loadData();
       },
-      child: Padding(
+      child: AlCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(LucideIcons.users, size: 20, color: AppColors.emerald600),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(groupName, style: AppTypography.heading3),
+                ),
+                Icon(LucideIcons.chevronRight, size: 18, color: AppColors.gray400),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                SizedBox(
+                  width: (members.length.clamp(0, 4) * 28).toDouble() + 8,
+                  height: 32,
+                  child: Stack(
+                    children: members.take(4).toList().asMap().entries.map((e) {
+                      final user = e.value['user'] as Map<String, dynamic>? ?? {};
+                      final name = user['name'] as String? ?? '?';
+                      return Positioned(
+                        left: e.key * 28.0,
+                        child: AlAvatar.small(
+                          text: name.isNotEmpty ? name.characters.first : '?',
+                          imageUrl: user['avatar'] as String?,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '멤버 ${members.length}명',
+                  style: AppTypography.caption.copyWith(color: AppColors.gray500),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  '공유 $itemCount건',
+                  style: AppTypography.caption.copyWith(color: AppColors.gray500),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!isAdmin) {
+      return Padding(
         padding: EdgeInsets.only(bottom: AppSpacing.md),
-        child: AlCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: card,
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppSpacing.md),
+      child: Dismissible(
+        key: ValueKey(groupId),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) async {
+          _confirmGroupDelete(groupId, groupName);
+          return false; // 다이얼로그에서 처리하므로 자동 dismiss 방지
+        },
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: EdgeInsets.only(right: AppSpacing.xl),
+          decoration: BoxDecoration(
+            color: AppColors.red600,
+            borderRadius: AppRadius.lgAll,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    LucideIcons.users,
-                    size: 20,
-                    color: AppColors.emerald600,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      group['name'] as String,
-                      style: AppTypography.heading3,
-                    ),
-                  ),
-                  Icon(
-                    LucideIcons.chevronRight,
-                    size: 18,
-                    color: AppColors.gray400,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  // 멤버 아바타 겹침
-                  SizedBox(
-                    width: (members.length.clamp(0, 4) * 28).toDouble() + 8,
-                    height: 32,
-                    child: Stack(
-                      children: members.take(4).toList().asMap().entries.map((
-                        e,
-                      ) {
-                        final user =
-                            e.value['user'] as Map<String, dynamic>? ?? {};
-                        final name = user['name'] as String? ?? '?';
-                        return Positioned(
-                          left: e.key * 28.0,
-                          child: AlAvatar.small(
-                            text: name.isNotEmpty ? name.characters.first : '?',
-                            imageUrl: user['avatar'] as String?,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  Spacer(),
-                  Text(
-                    '멤버 ${members.length}명',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.gray500,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Text(
-                    '공유 $itemCount건',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.gray500,
-                    ),
-                  ),
-                ],
+              Icon(LucideIcons.trash2, color: Colors.white, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                '삭제',
+                style: AppTypography.label.copyWith(color: Colors.white),
               ),
             ],
           ),
         ),
+        child: card,
       ),
+    );
+  }
+
+  void _confirmGroupDelete(String groupId, String groupName) {
+    AlConfirmDialog.show(
+      context: context,
+      title: '그룹 삭제',
+      message: "'$groupName' 그룹을 삭제하시겠습니까?\n모든 멤버와 공유 데이터가 삭제됩니다.",
+      onConfirm: () async {
+        try {
+          await ref.read(shareGroupServiceProvider).deleteGroup(groupId);
+          await _loadData();
+          if (mounted) showSuccessSnackBar(context, '그룹이 삭제되었습니다');
+        } catch (e) {
+          if (mounted) showErrorSnackBar(context, '$e');
+        }
+      },
     );
   }
 

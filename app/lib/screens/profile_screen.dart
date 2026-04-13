@@ -146,6 +146,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     onPressed: () => _showEditProfileSheet(user),
                   ),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  AlButton(
+                    label: '로그아웃',
+                    variant: AlButtonVariant.danger,
+                    icon: Icon(LucideIcons.logOut, size: 18, color: AppColors.red600),
+                    onPressed: () {
+                      AlConfirmDialog.show(
+                        context: context,
+                        title: '로그아웃',
+                        message: '정말 로그아웃하시겠습니까?',
+                        confirmLabel: '로그아웃',
+                        isDestructive: true,
+                        onConfirm: () {
+                          ref.read(authNotifierProvider.notifier).logout();
+                        },
+                      );
+                    },
+                  ),
                   const SizedBox(height: AppSpacing.xxxl),
                   GestureDetector(
                     onTap: _showWithdrawConfirm,

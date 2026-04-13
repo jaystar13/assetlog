@@ -238,24 +238,18 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
           const SizedBox(height: AppSpacing.md),
           ..._buildMemberList(members, myUserId, isAdmin),
 
-          // 그룹 나가기/삭제
-          const SizedBox(height: AppSpacing.sectionGap),
-          if (isAdmin)
-            AlButton(
-              label: '그룹 삭제',
-              variant: AlButtonVariant.danger,
-              icon: Icon(LucideIcons.trash2, size: 18, color: Colors.white),
-              onPressed: () => _confirmGroupDelete(),
-            )
-          else
+          // 그룹 나가기 (admin이 아닌 경우만 표시)
+          if (!isAdmin) ...[
+            const SizedBox(height: AppSpacing.sectionGap),
             AlButton(
               label: '그룹 나가기',
               variant: AlButtonVariant.danger,
               icon: Icon(LucideIcons.logOut, size: 18, color: Colors.white),
               onPressed: () => _confirmGroupLeave(),
             ),
+          ],
           if (isAdmin) ...[
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.md),
             Text('멤버를 길게 눌러 제거할 수 있습니다', style: AppTypography.caption.copyWith(color: AppColors.gray400)),
           ],
 
@@ -272,20 +266,6 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
             ..._activityLogs.map(_buildActivityItem),
         ],
       ),
-    );
-  }
-
-  void _confirmGroupDelete() {
-    AlConfirmDialog.show(
-      context: context,
-      title: '그룹 삭제',
-      message: '이 그룹을 삭제하시겠습니까?\n모든 멤버와 공유 데이터가 삭제됩니다.',
-      onConfirm: () async {
-        try {
-          await ref.read(shareGroupServiceProvider).deleteGroup(widget.groupId);
-          if (mounted) { showSuccessSnackBar(context, '그룹이 삭제되었습니다'); Navigator.of(context).pop(); }
-        } catch (e) { if (mounted) showErrorSnackBar(context, '$e'); }
-      },
     );
   }
 

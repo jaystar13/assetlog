@@ -9,6 +9,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { CardCompaniesModule } from './card-companies/card-companies.module';
 import { ImportModule } from './import/import.module';
 import { ShareGroupsModule } from './share-groups/share-groups.module';
+import { QuotesModule } from './quotes/quotes.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CardCompaniesModule,
     ImportModule,
     ShareGroupsModule,
+    QuotesModule,
   ],
   providers: [
     {
