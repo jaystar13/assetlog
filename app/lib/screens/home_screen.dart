@@ -7,7 +7,7 @@ import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
 import '../design_system/components/al_card.dart';
-import '../design_system/components/al_button.dart';
+import '../design_system/components/al_async_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
 import '../design_system/components/al_input.dart';
 import '../design_system/components/al_stat_row.dart';
@@ -130,11 +130,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // dashboard 데이터 헬퍼 — build()에서 세팅
-  HomeDashboard? _dashboard;
+  // 가장 최근에 로드된 dashboard 데이터 (bottom sheet 등에서 참조용)
+  HomeDashboard? _lastDashboard;
 
   void _showGoalSettingSheet() {
-    final goal = _dashboard?.goal;
+    final goal = _lastDashboard?.goal;
     _goalStartController.text = goal?.startAmount.toString() ?? '';
     _goalAmountController.text = goal?.targetAmount.toString() ?? '';
     _goalDeadlineController.text = goal?.deadline ?? '';
@@ -184,8 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             controller: _goalDeadlineController,
           ),
           const SizedBox(height: AppSpacing.xl),
-          _SaveGoalButton(
-            onSave: () async {
+          AlAsyncButton(
+            label: '저장',
+            onPressed: () async {
               final startAmount = CurrencyInputFormatter.parse(_goalStartController.text);
               final targetAmount = CurrencyInputFormatter.parse(_goalAmountController.text);
               final deadline = _goalDeadlineController.text.trim();
@@ -200,8 +201,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     targetAmount: targetAmount,
                     deadline: deadline,
                   );
-              if (context.mounted) Navigator.of(context).pop();
-              if (mounted) showSuccessSnackBar(context, '목표가 설정되었습니다');
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+              showSuccessSnackBar(context, '목표가 설정되었습니다');
             },
           ),
         ],
@@ -232,7 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         data: (dashboard) {
-          _dashboard = dashboard;
+          _lastDashboard = dashboard;
           return SingleChildScrollView(
             padding: EdgeInsets.only(bottom: AppSpacing.bottomNavSafeArea),
             child: Column(
@@ -247,13 +249,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       const SizedBox(height: AppSpacing.lg),
                       _buildDailyQuote(),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildGoalVisualizerCard(),
+                      _buildGoalVisualizerCard(dashboard),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildNetWorthCard(),
+                      _buildNetWorthCard(dashboard),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildMonthlyCashFlowCard(),
+                      _buildMonthlyCashFlowCard(dashboard),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildSharedAssetsSection(),
+                      _buildSharedAssetsSection(dashboard),
                     ],
                   ),
                 ),
@@ -357,13 +359,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // === Goal Visualizer Card ===
-  Widget _buildGoalVisualizerCard() {
-    final goal = _dashboard!.goal;
+  Widget _buildGoalVisualizerCard(HomeDashboard dashboard) {
+    final goal = dashboard.goal;
     final goalStart = goal?.startAmount ?? 0;
     final goalTarget = goal?.targetAmount ?? 0;
-    final remaining = goalTarget - _dashboard!.netWorth;
+    final remaining = goalTarget - dashboard.netWorth;
     final range = goalTarget - goalStart;
-    final progress = _dashboard!.netWorth - goalStart;
+    final progress = dashboard.netWorth - goalStart;
     final fraction = range > 0 ? (progress / range).clamp(0.0, 1.0) : 0.0;
 
     return AlCard(
@@ -547,7 +549,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Text(
-                        formatKoreanWon(_dashboard!.netWorth),
+                        formatKoreanWon(dashboard.netWorth),
                         style: AppTypography.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -602,7 +604,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // === Net Worth Card ===
-  Widget _buildNetWorthCard() {
+  Widget _buildNetWorthCard(HomeDashboard dashboard) {
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -613,14 +615,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatKoreanWon(_dashboard!.netWorth),
+                formatKoreanWon(dashboard.netWorth),
                 style: AppTypography.amountLarge,
               ),
               const SizedBox(width: AppSpacing.sm),
               Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: AlChangeIndicator.percent(
-                  percent: _dashboard!.netWorthChangePercent,
+                  percent: dashboard.netWorthChangePercent,
                 ),
               ),
             ],
@@ -629,7 +631,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           AlStatRow(
             dotColor: AppColors.blue600,
             label: '총 자산',
-            value: formatKoreanWon(_dashboard!.totalAssets),
+            value: formatKoreanWon(dashboard.totalAssets),
             valueColor: AppColors.blue600,
             backgroundColor: AppColors.blue50,
           ),
@@ -637,31 +639,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           AlStatRow(
             dotColor: AppColors.red600,
             label: '총 부채',
-            value: formatKoreanWon(_dashboard!.totalDebts),
+            value: formatKoreanWon(dashboard.totalDebts),
             valueColor: AppColors.red600,
             backgroundColor: AppColors.red50,
           ),
-          if (_dashboard!.lastMonthNetWorth != null) ...[
+          if (dashboard.lastMonthNetWorth != null) ...[
             const SizedBox(height: AppSpacing.lg),
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald50 : AppColors.red50,
+                color: dashboard.netWorthGrowth >= 0 ? AppColors.emerald50 : AppColors.red50,
                 borderRadius: AppRadius.smAll,
               ),
               child: Row(
                 children: [
                   Icon(
-                    _dashboard!.netWorthGrowth >= 0 ? LucideIcons.trendingUp : LucideIcons.trendingDown,
+                    dashboard.netWorthGrowth >= 0 ? LucideIcons.trendingUp : LucideIcons.trendingDown,
                     size: 16,
-                    color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald600 : AppColors.red600,
+                    color: dashboard.netWorthGrowth >= 0 ? AppColors.emerald600 : AppColors.red600,
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    '전월 대비 ${_dashboard!.netWorthGrowth >= 0 ? '+' : ''}${formatKoreanWon(_dashboard!.netWorthGrowth)}',
+                    '전월 대비 ${dashboard.netWorthGrowth >= 0 ? '+' : ''}${formatKoreanWon(dashboard.netWorthGrowth)}',
                     style: AppTypography.bodySmall.copyWith(
-                      color: _dashboard!.netWorthGrowth >= 0 ? AppColors.emerald700 : AppColors.red700,
+                      color: dashboard.netWorthGrowth >= 0 ? AppColors.emerald700 : AppColors.red700,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -675,7 +677,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // === Monthly Cash Flow Card ===
-  Widget _buildMonthlyCashFlowCard() {
+  Widget _buildMonthlyCashFlowCard(HomeDashboard dashboard) {
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,7 +697,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Text('수입', style: AppTypography.bodySmall),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_dashboard!.monthlyIncome),
+                      formatKoreanWon(dashboard.monthlyIncome),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.emerald600,
                       ),
@@ -710,7 +712,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Text('지출', style: AppTypography.bodySmall),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      formatKoreanWon(_dashboard!.monthlyExpense),
+                      formatKoreanWon(dashboard.monthlyExpense),
                       style: AppTypography.amountSmall.copyWith(
                         color: AppColors.red600,
                       ),
@@ -726,15 +728,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
               value:
-                  (_dashboard!.monthlyIncome > 0
-                          ? _dashboard!.monthlyExpense /
-                                _dashboard!.monthlyIncome
+                  (dashboard.monthlyIncome > 0
+                          ? dashboard.monthlyExpense /
+                                dashboard.monthlyIncome
                           : 0.0)
                       .clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.gray200,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _dashboard!.monthlyExpense > _dashboard!.monthlyIncome
+                dashboard.monthlyExpense > dashboard.monthlyIncome
                     ? AppColors.red600
                     : AppColors.emerald500,
               ),
@@ -742,7 +744,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '지출 비율: ${_dashboard!.monthlyIncome > 0 ? (_dashboard!.monthlyExpense / _dashboard!.monthlyIncome * 100).round() : 0}%',
+            '지출 비율: ${dashboard.monthlyIncome > 0 ? (dashboard.monthlyExpense / dashboard.monthlyIncome * 100).round() : 0}%',
             style: AppTypography.caption,
           ),
         ],
@@ -751,8 +753,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // === Shared Assets Section ===
-  Widget _buildSharedAssetsSection() {
-    final sharedGroups = _dashboard!.sharedGroups;
+  Widget _buildSharedAssetsSection(HomeDashboard dashboard) {
+    final sharedGroups = dashboard.sharedGroups;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,31 +831,3 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-class _SaveGoalButton extends StatefulWidget {
-  final Future<void> Function() onSave;
-  const _SaveGoalButton({required this.onSave});
-
-  @override
-  State<_SaveGoalButton> createState() => _SaveGoalButtonState();
-}
-
-class _SaveGoalButtonState extends State<_SaveGoalButton> {
-  bool _isSaving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlButton(
-      label: _isSaving ? '저장 중...' : '저장',
-      onPressed: _isSaving ? null : () async {
-        setState(() => _isSaving = true);
-        try {
-          await widget.onSave();
-        } catch (e) {
-          if (mounted) showErrorSnackBar(context, '저장 실패: $e');
-        } finally {
-          if (mounted) setState(() => _isSaving = false);
-        }
-      },
-    );
-  }
-}

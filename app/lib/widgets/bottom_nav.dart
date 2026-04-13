@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../design_system/tokens/colors.dart';
 
 class BottomNav extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -18,12 +17,16 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final navTheme = theme.bottomNavigationBarTheme;
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.gray200)),
+          color: colorScheme.surface,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         child: SafeArea(
           child: SizedBox(
@@ -46,10 +49,10 @@ class BottomNav extends StatelessWidget {
                           item.icon,
                           size: 20,
                           color: isActive
-                              ? AppColors.emerald600
-                              : AppColors.gray400,
+                              ? navTheme.selectedItemColor ?? colorScheme.primary
+                              : navTheme.unselectedItemColor,
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           item.label,
                           style: TextStyle(
@@ -57,8 +60,8 @@ class BottomNav extends StatelessWidget {
                             fontWeight:
                                 isActive ? FontWeight.w500 : FontWeight.normal,
                             color: isActive
-                                ? AppColors.emerald600
-                                : AppColors.gray500,
+                                ? navTheme.selectedItemColor ?? colorScheme.primary
+                                : navTheme.unselectedItemColor,
                           ),
                         ),
                       ],

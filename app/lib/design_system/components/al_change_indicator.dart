@@ -5,6 +5,7 @@ import '../tokens/colors.dart';
 class AlChangeIndicator extends StatelessWidget {
   final String value;
   final bool isPositive;
+  final bool isZero;
   final double iconSize;
   final double fontSize;
 
@@ -12,6 +13,7 @@ class AlChangeIndicator extends StatelessWidget {
     super.key,
     required this.value,
     required this.isPositive,
+    this.isZero = false,
     this.iconSize = 16,
     this.fontSize = 14,
   });
@@ -23,7 +25,8 @@ class AlChangeIndicator extends StatelessWidget {
   }) {
     return AlChangeIndicator(
       value: '${percent.abs().toStringAsFixed(1)}%',
-      isPositive: percent >= 0,
+      isPositive: percent > 0,
+      isZero: percent == 0,
       iconSize: iconSize,
       fontSize: fontSize,
     );
@@ -31,6 +34,24 @@ class AlChangeIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isZero) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.minus, size: iconSize, color: AppColors.gray400),
+          const SizedBox(width: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w500,
+              color: AppColors.gray400,
+            ),
+          ),
+        ],
+      );
+    }
+
     final color = isPositive ? AppColors.emerald600 : AppColors.red600;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -40,7 +61,7 @@ class AlChangeIndicator extends StatelessWidget {
           size: iconSize,
           color: color,
         ),
-        SizedBox(width: 2),
+        const SizedBox(width: 2),
         Text(
           value,
           style: TextStyle(

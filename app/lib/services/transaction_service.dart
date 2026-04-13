@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/network/api_response_unwrapper.dart';
 import '../models/transaction.dart';
 
-class TransactionService {
+class TransactionService with ApiResponseUnwrapper {
   final Dio _dio;
 
   TransactionService(this._dio);
@@ -18,7 +19,7 @@ class TransactionService {
         '/transactions',
         queryParameters: {'month': month, 'type': ?type},
       );
-      final data = _unwrapList(response);
+      final data = unwrapList(response);
       return data
           .map((e) => Transaction.fromMap(e as Map<String, dynamic>))
           .toList();
@@ -54,7 +55,7 @@ class TransactionService {
           'shareGroupIds': ?shareGroupIds,
         },
       );
-      return Transaction.fromMap(_unwrap(response));
+      return Transaction.fromMap(unwrap(response));
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -67,7 +68,7 @@ class TransactionService {
   ) async {
     try {
       final response = await _dio.patch('/transactions/$id', data: data);
-      return Transaction.fromMap(_unwrap(response));
+      return Transaction.fromMap(unwrap(response));
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -96,25 +97,10 @@ class TransactionService {
         'file': await MultipartFile.fromFile(filePath, filename: fileName),
       });
       final response = await _dio.post('/import/transactions', data: formData);
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  Map<String, dynamic> _unwrap(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as Map<String, dynamic>;
-    }
-    return body as Map<String, dynamic>;
-  }
-
-  List<dynamic> _unwrapList(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as List<dynamic>;
-    }
-    return body as List<dynamic>;
-  }
 }

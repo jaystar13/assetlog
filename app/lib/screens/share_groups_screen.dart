@@ -97,7 +97,7 @@ class _ShareGroupsScreenState extends ConsumerState<ShareGroupsScreen>
           ),
         ],
       ),
-    );
+    ).then((_) => nameController.dispose());
   }
 
   @override

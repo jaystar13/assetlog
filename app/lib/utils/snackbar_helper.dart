@@ -11,7 +11,7 @@ void showSuccessSnackBar(BuildContext context, String message) {
         content: Row(
           children: [
             Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
         ),
@@ -31,7 +31,7 @@ void showErrorSnackBar(BuildContext context, String message) {
         content: Row(
           children: [
             Icon(Icons.error_outline, color: Colors.white, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
         ),
@@ -51,7 +51,7 @@ void showInfoSnackBar(BuildContext context, String message) {
         content: Row(
           children: [
             Icon(Icons.info_outline, color: Colors.white, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
         ),

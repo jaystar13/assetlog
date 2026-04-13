@@ -6,6 +6,7 @@ import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
 import '../design_system/tokens/radius.dart';
+import '../design_system/components/al_async_button.dart';
 import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
@@ -16,6 +17,34 @@ import '../design_system/components/al_screen_header.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/date_format.dart';
 import '../utils/user_preferences.dart';
+
+/// 프로필 화면의 활동 요약 데이터를 비동기로 가져오는 Provider.
+final _activitySummaryProvider =
+    FutureProvider.autoDispose<
+      ({int assetCount, int txCount, int memberCount})
+    >((ref) async {
+      final month = toMonthKey(DateTime.now());
+      final results = await Future.wait([
+        ref.watch(assetServiceProvider).getAssets(),
+        ref.watch(transactionServiceProvider).getTransactions(month: month),
+        ref.watch(shareGroupServiceProvider).getMyGroups(),
+      ]);
+
+      final assetCount = (results[0] as List).length;
+      final txCount = (results[1] as List).length;
+      final groups = results[2] as List;
+      int memberCount = 0;
+      for (final g in groups) {
+        final members = (g as Map<String, dynamic>)['members'] as List?;
+        if (members != null) memberCount += members.length;
+      }
+
+      return (
+        assetCount: assetCount,
+        txCount: txCount,
+        memberCount: memberCount,
+      );
+    });
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -56,7 +85,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           maxLength: 20,
           decoration: InputDecoration(
             hintText: '나만의 한 줄 소개를 입력하세요',
-            hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.gray400),
+            hintStyle: AppTypography.bodyMedium.copyWith(
+              color: AppColors.gray400,
+            ),
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: AppColors.emerald600),
             ),
@@ -76,7 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   @override
@@ -91,40 +122,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           AlScreenHeader(title: '마이 프로필', showBack: true),
           Expanded(
             child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: AppSpacing.screenPadding,
-          right: AppSpacing.screenPadding,
-          top: AppSpacing.xl,
-          bottom: AppSpacing.xxl,
-        ),
-        child: Column(
-          children: [
-            _buildProfileHeader(user),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildInfoCard(user),
-            const SizedBox(height: AppSpacing.lg),
-            _buildActivityCard(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            AlButton(
-              label: '프로필 수정',
-              variant: AlButtonVariant.secondary,
-              icon: Icon(LucideIcons.pencil, size: 16, color: AppColors.gray700),
-              onPressed: () => _showEditProfileSheet(user),
-            ),
-            const SizedBox(height: AppSpacing.xxxl),
-            GestureDetector(
-              onTap: _showWithdrawConfirm,
-              child: Text(
-                '탈퇴하기',
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.gray400,
-                  decoration: TextDecoration.underline,
-                ),
+              padding: EdgeInsets.only(
+                left: AppSpacing.screenPadding,
+                right: AppSpacing.screenPadding,
+                top: AppSpacing.xl,
+                bottom: AppSpacing.xxl,
+              ),
+              child: Column(
+                children: [
+                  _buildProfileHeader(user),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  _buildInfoCard(user),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildActivityCard(),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  AlButton(
+                    label: '프로필 수정',
+                    variant: AlButtonVariant.secondary,
+                    icon: Icon(
+                      LucideIcons.pencil,
+                      size: 16,
+                      color: AppColors.gray700,
+                    ),
+                    onPressed: () => _showEditProfileSheet(user),
+                  ),
+                  const SizedBox(height: AppSpacing.xxxl),
+                  GestureDetector(
+                    onTap: _showWithdrawConfirm,
+                    child: Text(
+                      '탈퇴하기',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.gray400,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
           ),
         ],
       ),
@@ -213,7 +248,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     AlConfirmDialog.show(
       context: context,
       title: '탈퇴하기',
-      message: '정말 탈퇴하시겠습니까?\n\n7일 이내에 다시 로그인하면 탈퇴가 취소됩니다.\n7일 후 모든 데이터가 영구 삭제됩니다.',
+      message:
+          '정말 탈퇴하시겠습니까?\n\n7일 이내에 다시 로그인하면 탈퇴가 취소됩니다.\n7일 후 모든 데이터가 영구 삭제됩니다.',
       confirmLabel: '탈퇴',
       onConfirm: () async {
         try {
@@ -227,19 +263,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showEditProfileSheet(Map<String, dynamic>? user) {
-    final nameController = TextEditingController(text: user?['name'] as String? ?? '');
+    final nameController = TextEditingController(
+      text: user?['name'] as String? ?? '',
+    );
 
     AlBottomSheet.show(
       context: context,
       title: '프로필 수정',
       child: Column(
         children: [
-          AlInput(label: '이름', placeholder: '이름을 입력하세요', controller: nameController),
+          AlInput(
+            label: '이름',
+            placeholder: '이름을 입력하세요',
+            controller: nameController,
+          ),
           const SizedBox(height: AppSpacing.xl),
-          _SaveButton(
+          AlAsyncButton(
             label: '저장',
             savingLabel: '저장 중...',
-            onSave: () async {
+            onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) {
                 showErrorSnackBar(context, '이름을 입력해 주세요');
@@ -247,52 +289,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               }
               await ref.read(authServiceProvider).updateProfile(name: name);
               await ref.read(authNotifierProvider.notifier).checkAuthStatus();
-              if (context.mounted) Navigator.of(context).pop();
-              if (mounted) showSuccessSnackBar(context, '프로필이 수정되었습니다');
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+              showSuccessSnackBar(context, '프로필이 수정되었습니다');
             },
           ),
         ],
       ),
-    );
+    ).then((_) => nameController.dispose());
   }
 
   Widget _buildActivityCard() {
-    final now = DateTime.now();
-    final month = toMonthKey(now);
+    final activityAsync = ref.watch(_activitySummaryProvider);
 
-    return FutureBuilder<List<dynamic>>(
-      future: Future.wait([
-        ref.read(assetServiceProvider).getAssets(),
-        ref.read(transactionServiceProvider).getTransactions(month: month),
-        ref.read(shareGroupServiceProvider).getMyGroups(),
-      ]),
-      builder: (context, snapshot) {
-        final assetCount = snapshot.hasData ? (snapshot.data![0] as List).length : 0;
-        final txCount = snapshot.hasData ? (snapshot.data![1] as List).length : 0;
-        final groups = snapshot.hasData ? (snapshot.data![2] as List) : [];
-        int memberCount = 0;
-        for (final g in groups) {
-          final members = (g as Map<String, dynamic>)['members'] as List?;
-          if (members != null) memberCount += members.length;
-        }
-
-        return AlCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('활동 요약', style: AppTypography.heading3),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: [
-                  Expanded(child: _buildStatItem('등록 자산', '$assetCount', LucideIcons.wallet)),
-                  Expanded(child: _buildStatItem('이번 달 거래', '$txCount', LucideIcons.arrowLeftRight)),
-                  Expanded(child: _buildStatItem('공유 멤버', '$memberCount', LucideIcons.users)),
-                ],
-              ),
-            ],
+    return AlCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('활동 요약', style: AppTypography.heading3),
+          const SizedBox(height: AppSpacing.lg),
+          activityAsync.when(
+            loading: () => const Center(
+              child: SizedBox(height: 80, child: CircularProgressIndicator()),
+            ),
+            error: (_, _) => Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem('등록 자산', '-', LucideIcons.wallet),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    '이번 달 거래',
+                    '-',
+                    LucideIcons.arrowLeftRight,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatItem('공유 멤버', '-', LucideIcons.users),
+                ),
+              ],
+            ),
+            data: (summary) => Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    '등록 자산',
+                    '${summary.assetCount}',
+                    LucideIcons.wallet,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    '이번 달 거래',
+                    '${summary.txCount}',
+                    LucideIcons.arrowLeftRight,
+                  ),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    '공유 멤버',
+                    '${summary.memberCount}',
+                    LucideIcons.users,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -311,14 +375,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Icon(icon, size: 18, color: AppColors.gray600),
           ),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(label, style: AppTypography.bodyMedium),
-          ),
+          Expanded(child: Text(label, style: AppTypography.bodyMedium)),
           Text(
             value,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.gray600,
-            ),
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.gray600),
           ),
         ],
       ),
@@ -344,47 +404,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(height: AppSpacing.sm),
         Text(
           value,
-          style: AppTypography.heading3.copyWith(
-            color: AppColors.emerald700,
-          ),
+          style: AppTypography.heading3.copyWith(color: AppColors.emerald700),
         ),
         SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTypography.caption,
-        ),
+        Text(label, style: AppTypography.caption),
       ],
     );
   }
 }
 
-class _SaveButton extends StatefulWidget {
-  final String label;
-  final String savingLabel;
-  final Future<void> Function() onSave;
-  const _SaveButton({required this.label, required this.savingLabel, required this.onSave});
-
-  @override
-  State<_SaveButton> createState() => _SaveButtonState();
-}
-
-class _SaveButtonState extends State<_SaveButton> {
-  bool _isSaving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlButton(
-      label: _isSaving ? widget.savingLabel : widget.label,
-      onPressed: _isSaving ? null : () async {
-        setState(() => _isSaving = true);
-        try {
-          await widget.onSave();
-        } catch (e) {
-          if (mounted) showErrorSnackBar(context, '수정 실패: $e');
-        } finally {
-          if (mounted) setState(() => _isSaving = false);
-        }
-      },
-    );
-  }
-}

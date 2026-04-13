@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/network/api_response_unwrapper.dart';
 
-class AuthService {
+class AuthService with ApiResponseUnwrapper {
   final Dio _dio;
 
   AuthService(this._dio);
@@ -17,7 +18,7 @@ class AuthService {
         data: {'refreshToken': refreshToken},
         options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
       );
-      final data = _unwrap(response);
+      final data = unwrap(response);
       return (
         accessToken: data['accessToken'] as String,
         refreshToken: data['refreshToken'] as String,
@@ -31,7 +32,7 @@ class AuthService {
   Future<Map<String, dynamic>> exchangeAuthCode(String code) async {
     try {
       final response = await _dio.post('/auth/exchange', data: {'code': code});
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -50,7 +51,7 @@ class AuthService {
   Future<Map<String, dynamic>> getMe() async {
     try {
       final response = await _dio.get('/auth/me');
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -66,7 +67,7 @@ class AuthService {
         '/users/me',
         data: {'name': ?name, 'avatar': ?avatar},
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -85,11 +86,7 @@ class AuthService {
   Future<Map<String, dynamic>?> getGoal() async {
     try {
       final response = await _dio.get('/users/me/goal');
-      final body = response.data;
-      if (body is Map<String, dynamic> && body.containsKey('data')) {
-        return body['data'] as Map<String, dynamic>?;
-      }
-      return body as Map<String, dynamic>?;
+      return unwrapOrNull(response);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       throw ApiException.fromDioException(e);
@@ -111,18 +108,10 @@ class AuthService {
           'deadline': deadline,
         },
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  /// 백엔드 응답 래퍼 {data, meta}에서 data 추출
-  Map<String, dynamic> _unwrap(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as Map<String, dynamic>;
-    }
-    return body as Map<String, dynamic>;
-  }
 }

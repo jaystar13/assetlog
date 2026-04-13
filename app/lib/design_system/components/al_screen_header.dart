@@ -37,7 +37,7 @@ class AlScreenHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.lg),
                   // 메인 행: 뒤로가기 + 제목 + 액션
                   Row(
                     children: [
@@ -62,10 +62,10 @@ class AlScreenHeader extends StatelessWidget {
                   ),
                   // 서브타이틀
                   if (subtitle != null) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(subtitle!, style: AppTypography.bodyMedium),
                   ],
-                  SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
               ),
             ),

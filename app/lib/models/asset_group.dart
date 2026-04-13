@@ -28,7 +28,14 @@ class AssetGroup {
     return ((totalValue - totalPreviousValue) / totalPreviousValue.abs()) * 100;
   }
 
-  CategoryColors get colors => AppColors.category[colorKey]!;
+  static const _fallbackColors = CategoryColors(
+    bg: AppColors.gray600,
+    text: AppColors.gray600,
+    light: AppColors.gray50,
+    hex: AppColors.gray600,
+  );
+
+  CategoryColors get colors => AppColors.category[colorKey] ?? _fallbackColors;
 
   AssetGroup copyWith({
     String? id,

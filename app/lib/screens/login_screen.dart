@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
@@ -79,11 +80,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
       // 사용자가 인앱 브라우저를 닫은 경우는 무시
-      final msg = e.toString();
-      final isCancelled = msg.contains('CANCELED') || msg.contains('cancel');
-      if (!isCancelled && mounted) {
+      if (e.code != 'CANCELED' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인에 실패했습니다. 다시 시도해 주세요.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('로그인에 실패했습니다. 다시 시도해 주세요.')),
         );

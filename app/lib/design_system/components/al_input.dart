@@ -13,7 +13,6 @@ class AlInput extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
-  final bool required;
   final int maxLines;
 
   const AlInput({
@@ -25,7 +24,6 @@ class AlInput extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.onChanged,
-    this.required = false,
     this.maxLines = 1,
   });
 
@@ -39,12 +37,12 @@ class AlInput extends StatelessWidget {
             children: [
               if (prefixIcon != null) ...[
                 prefixIcon!,
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
               ],
               Text(label!, style: AppTypography.label),
             ],
           ),
-          SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
         ],
         TextField(
           controller: controller,
@@ -57,7 +55,7 @@ class AlInput extends StatelessWidget {
             hintText: placeholder,
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.lg,
-              vertical: maxLines > 1 ? AppSpacing.md : AppSpacing.md,
+              vertical: AppSpacing.md,
             ),
             border: OutlineInputBorder(
               borderRadius: AppRadius.smAll,

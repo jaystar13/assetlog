@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/network/api_response_unwrapper.dart';
 
-class AssetService {
+class AssetService with ApiResponseUnwrapper {
   final Dio _dio;
 
   AssetService(this._dio);
@@ -17,7 +18,7 @@ class AssetService {
         '/assets',
         queryParameters: {'status': status, 'month': ?month},
       );
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -38,7 +39,7 @@ class AssetService {
           'shareGroupIds': ?shareGroupIds,
         },
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -51,7 +52,7 @@ class AssetService {
   ) async {
     try {
       final response = await _dio.patch('/assets/$id', data: data);
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -70,7 +71,7 @@ class AssetService {
   Future<Map<String, dynamic>> closeAsset(String id) async {
     try {
       final response = await _dio.patch('/assets/$id/close');
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -80,7 +81,7 @@ class AssetService {
   Future<List<Map<String, dynamic>>> getHistory(String assetId) async {
     try {
       final response = await _dio.get('/assets/$assetId/history');
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -97,25 +98,10 @@ class AssetService {
         '/assets/$assetId/history/$month',
         data: {'value': value},
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  Map<String, dynamic> _unwrap(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as Map<String, dynamic>;
-    }
-    return body as Map<String, dynamic>;
-  }
-
-  List<dynamic> _unwrapList(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as List<dynamic>;
-    }
-    return body as List<dynamic>;
-  }
 }

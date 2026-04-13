@@ -5,10 +5,10 @@ class SharedUser {
   final String name;
   final String email;
   final String avatar;
-  PermissionLevel cashflowPermission;
-  Map<String, PermissionLevel> assetPermissions;
+  final PermissionLevel cashflowPermission;
+  final Map<String, PermissionLevel> assetPermissions;
 
-  SharedUser({
+  const SharedUser({
     required this.id,
     required this.name,
     required this.email,
@@ -16,4 +16,22 @@ class SharedUser {
     required this.cashflowPermission,
     required this.assetPermissions,
   });
+
+  SharedUser copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? avatar,
+    PermissionLevel? cashflowPermission,
+    Map<String, PermissionLevel>? assetPermissions,
+  }) {
+    return SharedUser(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      avatar: avatar ?? this.avatar,
+      cashflowPermission: cashflowPermission ?? this.cashflowPermission,
+      assetPermissions: assetPermissions ?? this.assetPermissions,
+    );
+  }
 }

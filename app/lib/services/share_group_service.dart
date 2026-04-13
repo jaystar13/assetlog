@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/network/api_response_unwrapper.dart';
 
-class ShareGroupService {
+class ShareGroupService with ApiResponseUnwrapper {
   final Dio _dio;
 
   ShareGroupService(this._dio);
@@ -12,7 +13,7 @@ class ShareGroupService {
   Future<Map<String, dynamic>> createGroup(String name) async {
     try {
       final response = await _dio.post('/share-groups', data: {'name': name});
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -21,7 +22,7 @@ class ShareGroupService {
   Future<List<Map<String, dynamic>>> getMyGroups() async {
     try {
       final response = await _dio.get('/share-groups');
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -30,7 +31,7 @@ class ShareGroupService {
   Future<Map<String, dynamic>> getGroup(String groupId) async {
     try {
       final response = await _dio.get('/share-groups/$groupId');
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -63,7 +64,7 @@ class ShareGroupService {
           'message': ?message,
         },
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -90,7 +91,7 @@ class ShareGroupService {
   Future<List<Map<String, dynamic>>> getReceivedInvitations() async {
     try {
       final response = await _dio.get('/share-groups/invitations/received');
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -101,7 +102,7 @@ class ShareGroupService {
       final response = await _dio.post(
         '/share-groups/invitations/$invitationId/accept',
       );
-      return _unwrap(response);
+      return unwrap(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -137,11 +138,7 @@ class ShareGroupService {
         '/share-groups/item-groups',
         queryParameters: {'itemType': itemType, 'itemId': itemId},
       );
-      final body = response.data;
-      final data = body is Map<String, dynamic> && body.containsKey('data')
-          ? body['data']
-          : body;
-      return (data as List).cast<String>();
+      return unwrapList(response).cast<String>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -160,7 +157,7 @@ class ShareGroupService {
   Future<List<Map<String, dynamic>>> getActivityLogs(String groupId) async {
     try {
       final response = await _dio.get('/share-groups/$groupId/activity');
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -177,7 +174,7 @@ class ShareGroupService {
         '/share-groups/$groupId/transactions',
         queryParameters: {'month': ?month},
       );
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -192,27 +189,10 @@ class ShareGroupService {
         '/share-groups/$groupId/assets',
         queryParameters: {'month': ?month},
       );
-      return _unwrapList(response).cast<Map<String, dynamic>>();
+      return unwrapList(response).cast<Map<String, dynamic>>();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  // ─── Helpers ───────────────────────────────────
-
-  Map<String, dynamic> _unwrap(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as Map<String, dynamic>;
-    }
-    return body as Map<String, dynamic>;
-  }
-
-  List<dynamic> _unwrapList(Response response) {
-    final body = response.data;
-    if (body is Map<String, dynamic> && body.containsKey('data')) {
-      return body['data'] as List<dynamic>;
-    }
-    return body as List<dynamic>;
-  }
 }

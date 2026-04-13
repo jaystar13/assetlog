@@ -155,16 +155,19 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
                     color: selectedColor,
                   );
                   await _loadData();
-                  if (mounted) showSuccessSnackBar(context, '초대를 보냈습니다');
+                  if (context.mounted) showSuccessSnackBar(context, '초대를 보냈습니다');
                 } catch (e) {
-                  if (mounted) showErrorSnackBar(context, '$e');
+                  if (context.mounted) showErrorSnackBar(context, '$e');
                 }
               },
             ),
           ],
         ),
       ),
-    );
+    ).then((_) {
+      emailController.dispose();
+      nicknameController.dispose();
+    });
   }
 
   @override

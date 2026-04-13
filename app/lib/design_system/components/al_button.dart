@@ -83,7 +83,7 @@ class AlButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           icon!,
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(label, style: AppTypography.button.copyWith(color: textColor)),
         ],
       );

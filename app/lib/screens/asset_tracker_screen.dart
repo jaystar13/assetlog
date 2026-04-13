@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../design_system/tokens/colors.dart';
 import '../design_system/tokens/typography.dart';
 import '../design_system/tokens/spacing.dart';
@@ -10,17 +9,17 @@ import '../design_system/components/al_card.dart';
 import '../design_system/components/al_button.dart';
 import '../design_system/components/al_bottom_sheet.dart';
 import '../design_system/components/al_confirm_dialog.dart';
-import '../design_system/components/al_input.dart';
 import '../design_system/components/al_change_indicator.dart';
 import '../design_system/components/al_month_selector.dart';
 import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/asset_notifier.dart';
 import '../core/providers.dart';
-import '../utils/currency_input_formatter.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/date_format.dart';
 import '../utils/snackbar_helper.dart';
+import '../widgets/asset_tracker/asset_form_sheets.dart';
+import '../widgets/asset_tracker/asset_pie_chart_card.dart';
 
 class AssetTrackerScreen extends ConsumerStatefulWidget {
   const AssetTrackerScreen({super.key});
@@ -53,222 +52,45 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
   void _goToPreviousMonth() {
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.month == 1
-            ? _selectedMonth.year - 1
-            : _selectedMonth.year,
-        _selectedMonth.month == 1 ? 12 : _selectedMonth.month - 1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
     });
   }
 
   void _goToNextMonth() {
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.month == 12
-            ? _selectedMonth.year + 1
-            : _selectedMonth.year,
-        _selectedMonth.month == 12 ? 1 : _selectedMonth.month + 1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     });
   }
 
   // ─── 새 자산 추가 Bottom Sheet ──────────────────────────────────────
   void _showAddAssetSheet() async {
-    final nameController = TextEditingController();
-    final valueController = TextEditingController();
     final groups = ref.read(assetNotifierProvider(_monthKey)).valueOrNull ?? [];
-    String selectedGroup = groups.isNotEmpty ? groups.first.id : 'cash';
-
-    // 공유 그룹 목록 가져오기
     List<Map<String, dynamic>> shareGroups = [];
     try {
       shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups();
-    } catch (_) {}
-    final selectedShareGroupIds = <String>{};
+    } catch (_) { /* 공유 그룹 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
     if (!mounted) return;
 
     AlBottomSheet.show(
       context: context,
       title: '새 자산 추가',
-      child: StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 자산 그룹 선택
-              Text('자산 유형', style: AppTypography.label),
-              const SizedBox(height: AppSpacing.sm),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.gray300),
-                  borderRadius: AppRadius.smAll,
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: selectedGroup,
-                    isExpanded: true,
-                    icon: Icon(
-                      LucideIcons.chevronDown,
-                      size: 16,
-                      color: AppColors.gray500,
-                    ),
-                    style: AppTypography.bodyLarge,
-                    items: groups
-                        .map(
-                          (g) => DropdownMenuItem(
-                            value: g.id,
-                            child: Row(
-                              children: [
-                                Icon(g.icon, size: 18, color: g.colors.text),
-                                const SizedBox(width: AppSpacing.sm),
-                                Text(g.name),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) setSheetState(() => selectedGroup = val);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // 자산명
-              AlInput(
-                label: '자산명',
-                placeholder: '예: 서울 아파트, S&P 500 ETF 등',
-                controller: nameController,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // 현재 가치
-              AlInput(
-                label: '현재 가치 (원)',
-                placeholder: '금액을 입력하세요',
-                controller: valueController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                prefixIcon: Icon(
-                  LucideIcons.banknote,
-                  size: 16,
-                  color: AppColors.gray500,
-                ),
-              ),
-              // 공유 그룹 선택
-              if (shareGroups.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xl),
-                Text('공유 그룹', style: AppTypography.label),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: shareGroups.map((g) {
-                    final gId = g['id'] as String;
-                    final gName = g['name'] as String;
-                    final sel = selectedShareGroupIds.contains(gId);
-                    return GestureDetector(
-                      onTap: () => setSheetState(() {
-                        if (sel) {
-                          selectedShareGroupIds.remove(gId);
-                        } else {
-                          selectedShareGroupIds.add(gId);
-                        }
-                      }),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: sel ? AppColors.emerald50 : AppColors.gray50,
-                          borderRadius: AppRadius.fullAll,
-                          border: Border.all(
-                            color: sel
-                                ? AppColors.emerald500
-                                : AppColors.gray200,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              sel
-                                  ? LucideIcons.checkCircle2
-                                  : LucideIcons.circle,
-                              size: 14,
-                              color: sel
-                                  ? AppColors.emerald600
-                                  : AppColors.gray400,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              gName,
-                              style: AppTypography.bodySmall.copyWith(
-                                color: sel
-                                    ? AppColors.emerald700
-                                    : AppColors.gray600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-
-              // 추가 버튼
-              AlButton(
-                label: '자산 추가',
-                icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final valueText = valueController.text.trim();
-
-                  if (name.isEmpty) {
-                    showErrorSnackBar(context, '자산명을 입력해 주세요');
-                    return;
-                  }
-                  if (valueText.isEmpty) {
-                    showErrorSnackBar(context, '금액을 입력해 주세요');
-                    return;
-                  }
-
-                  final value = CurrencyInputFormatter.parse(valueText);
-                  if (value == null) {
-                    showErrorSnackBar(context, '올바른 금액을 입력해 주세요');
-                    return;
-                  }
-
-                  final isDebt = selectedGroup == 'loans';
-                  final actualValue = isDebt ? -value.abs() : value;
-
-                  Navigator.of(context).pop();
-
-                  final notifier = ref.read(
-                    assetNotifierProvider(_monthKey).notifier,
-                  );
-                  await notifier.addAsset(
-                    categoryId: selectedGroup,
-                    name: name,
-                    initialValue: actualValue,
-                    shareGroupIds: selectedShareGroupIds.isNotEmpty
-                        ? selectedShareGroupIds.toList()
-                        : null,
-                  );
-
-                  _expandedGroups.add(selectedGroup);
-                  if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
-                },
-              ),
-            ],
-          );
+      child: AddAssetForm(
+        assetGroups: groups,
+        shareGroups: shareGroups,
+        onSubmit: ({
+          required String categoryId,
+          required String name,
+          required int value,
+          List<String>? shareGroupIds,
+        }) async {
+          await ref.read(assetNotifierProvider(_monthKey).notifier).addAsset(
+                categoryId: categoryId,
+                name: name,
+                initialValue: value,
+                shareGroupIds: shareGroupIds,
+              );
+          _expandedGroups.add(categoryId);
+          if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
         },
       ),
     );
@@ -276,112 +98,21 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
   // ─── 개별 자산 수정 Bottom Sheet ─────────────────────────────────────
   void _showEditAssetSheet(AssetItem item, AssetGroup group) {
-    final nameController = TextEditingController(text: item.name);
-    final valueController = TextEditingController(
-      text: item.currentValue.abs().toString(),
-    );
-
     AlBottomSheet.show(
       context: context,
       title: '자산 수정',
-      child: StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 자산 유형 표시 (읽기 전용)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: group.colors.light,
-                  borderRadius: AppRadius.smAll,
-                ),
-                child: Row(
-                  children: [
-                    Icon(group.icon, size: 18, color: group.colors.text),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      group.name,
-                      style: AppTypography.label.copyWith(
-                        color: group.colors.text,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // 자산명
-              AlInput(
-                label: '자산명',
-                placeholder: '예: 서울 아파트',
-                controller: nameController,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // 현재 가치
-              AlInput(
-                label: '현재 가치 (원)',
-                placeholder: '금액을 입력하세요',
-                controller: valueController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                prefixIcon: Icon(
-                  LucideIcons.banknote,
-                  size: 16,
-                  color: AppColors.gray500,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // 수정 버튼
-              AlButton(
-                label: '수정',
-                icon: Icon(LucideIcons.pencil, size: 18, color: Colors.white),
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final valueText = valueController.text.trim();
-
-                  if (name.isEmpty) {
-                    showErrorSnackBar(context, '자산명을 입력해 주세요');
-                    return;
-                  }
-                  if (valueText.isEmpty) {
-                    showErrorSnackBar(context, '금액을 입력해 주세요');
-                    return;
-                  }
-
-                  final value = CurrencyInputFormatter.parse(valueText);
-                  if (value == null) {
-                    showErrorSnackBar(context, '올바른 금액을 입력해 주세요');
-                    return;
-                  }
-
-                  final isDebt = group.id == 'loans';
-                  final actualValue = isDebt
-                      ? -value.abs().toInt()
-                      : value.toInt();
-
-                  Navigator.of(context).pop();
-
-                  final month = _monthKey;
-                  await ref
-                      .read(assetNotifierProvider(_monthKey).notifier)
-                      .updateAssetValue(
-                        assetId: item.id,
-                        month: month,
-                        value: actualValue,
-                      );
-
-                  if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
-                },
-              ),
-            ],
-          );
+      child: EditAssetForm(
+        item: item,
+        group: group,
+        onSubmit: ({
+          required String assetId,
+          required String name,
+          required int value,
+        }) async {
+          await ref
+              .read(assetNotifierProvider(_monthKey).notifier)
+              .updateAssetValue(assetId: assetId, month: _monthKey, value: value);
+          if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
         },
       ),
     );
@@ -476,78 +207,21 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   }
 
   void _showUpdateSheet(AssetGroup group) {
-    final controllers = <String, TextEditingController>{};
-    for (final item in group.items) {
-      controllers[item.id] = TextEditingController(
-        text: item.currentValue.abs().toString(),
-      );
-    }
-
     AlBottomSheet.show(
       context: context,
       title: '${group.name} 업데이트',
-      child: StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ...group.items.map((item) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(item.name, style: AppTypography.label),
-                          Text(
-                            '현재: ${formatKoreanWon(item.currentValue)}',
-                            style: AppTypography.bodySmall,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      AlInput(
-                        placeholder: '새 금액을 입력하세요',
-                        controller: controllers[item.id],
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              const SizedBox(height: AppSpacing.sm),
-              AlButton(
-                label: '업데이트',
-                onPressed: () async {
-                  Navigator.of(context).pop();
-
-                  final month = _monthKey;
-                  final notifier = ref.read(
-                    assetNotifierProvider(_monthKey).notifier,
-                  );
-                  final isDebt = group.id == 'loans';
-
-                  for (final item in group.items) {
-                    final text = controllers[item.id]?.text ?? '';
-                    final value = CurrencyInputFormatter.parse(text);
-                    if (value != null) {
-                      final actualValue = isDebt ? -value.abs() : value;
-                      await notifier.updateAssetValue(
-                        assetId: item.id,
-                        month: month,
-                        value: actualValue,
-                      );
-                    }
-                  }
-
-                  if (mounted) showSuccessSnackBar(context, '자산이 업데이트되었습니다');
-                },
-              ),
-            ],
-          );
+      child: UpdateAssetsForm(
+        group: group,
+        onSubmit: (updates) async {
+          final notifier = ref.read(assetNotifierProvider(_monthKey).notifier);
+          for (final entry in updates.entries) {
+            await notifier.updateAssetValue(
+              assetId: entry.key,
+              month: _monthKey,
+              value: entry.value,
+            );
+          }
+          if (mounted) showSuccessSnackBar(context, '자산이 업데이트되었습니다');
         },
       ),
     );
@@ -561,7 +235,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
     try {
       final groups = await ref.read(shareGroupServiceProvider).getMyGroups();
       if (mounted) setState(() => _myGroups = groups);
-    } catch (_) {}
+    } catch (_) { /* 공유 그룹 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
   }
 
   void _showGroupSelector() {
@@ -726,7 +400,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
           _lastAssetGroupKey = key;
         });
       }
-    } catch (_) {}
+    } catch (_) { /* 공유 그룹 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
   }
 
   Widget _buildAssetContent() {
@@ -770,7 +444,7 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.lg),
-                _buildPieChartCard(groups),
+                AssetPieChartCard(groups: groups),
                 const SizedBox(height: AppSpacing.sectionGap),
                 ...groups.map((group) {
                   // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
@@ -795,106 +469,6 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             ),
           ),
         );
-  }
-
-  // ─── Pie Chart Card ──────────────────────────────────────────────────
-
-  Widget _buildPieChartCard(List<AssetGroup> groups) {
-    // Only include positive-value groups for the composition chart
-    final positiveGroups = groups.where((g) => g.totalValue > 0).toList();
-    final totalPositive = positiveGroups.fold<num>(
-      0,
-      (sum, g) => sum + g.totalValue,
-    );
-
-    return AlCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('자산 구성', style: AppTypography.heading3),
-              Row(
-                children: [
-                  Text(
-                    '총 ${formatKoreanWon(groups.fold<num>(0, (sum, g) => sum + g.totalValue))}',
-                    style: AppTypography.label,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          SizedBox(
-            height: 200,
-            child: Row(
-              children: [
-                // Pie chart
-                Expanded(
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 60,
-                      sections: positiveGroups.map((group) {
-                        return PieChartSectionData(
-                          value: group.totalValue.toDouble(),
-                          color: group.colors.bg,
-                          radius: 32,
-                          title: '',
-                          showTitle: false,
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xl),
-                // Legend
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: positiveGroups.map((group) {
-                    final percent = totalPositive > 0
-                        ? (group.totalValue / totalPositive * 100)
-                        : 0.0;
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: AppSpacing.md),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: group.colors.bg,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(
-                            group.name,
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.gray700,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(
-                            '${percent.toStringAsFixed(1)}%',
-                            style: AppTypography.labelSmall.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   // ─── Asset Group Card ────────────────────────────────────────────────
