@@ -10,6 +10,8 @@ export default defineConfig({
     seed: "npx ts-node prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // 마이그레이션은 PgBouncer(pooled)가 아닌 direct connection 사용 권장
+    // Dev 환경(DIRECT_URL 미설정)에서는 DATABASE_URL로 fallback
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
