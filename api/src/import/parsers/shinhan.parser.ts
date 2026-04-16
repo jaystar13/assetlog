@@ -56,10 +56,6 @@ function parseAmount(raw: string): number {
   return parseInt(raw.replace(/,/g, '').trim(), 10);
 }
 
-function isOverseas(amountStr: string): boolean {
-  return amountStr.includes('.');
-}
-
 export function parseShinhanXls(fileBuffer: Buffer): ParsedTransaction[] {
   const rows = extractTableRows(fileBuffer.toString('utf-8'));
 
@@ -81,6 +77,9 @@ export function parseShinhanXls(fileBuffer: Buffer): ParsedTransaction[] {
   for (let i = headerIndex + 2; i < rows.length; i++) {
     const row = rows[i];
 
+    // '총합계' 행 도달 시 Sheet6 종료 → 이후 시트(할인내역 등) 진입 방지
+    if (row[0]?.includes('총합계')) break;
+
     // 날짜 형식이 아니면 스킵
     if (!DATE_PATTERN.test(row[0] ?? '')) continue;
     // 소계/합계 행 스킵
@@ -94,18 +93,13 @@ export function parseShinhanXls(fileBuffer: Buffer): ParsedTransaction[] {
     // 취소 건 스킵
     if (typeIndicator === '취소') continue;
 
-    // 금액 처리
-    const rawAmount = row[3] ?? '';
-    let amount: number;
+    // 금액: col[6] = '이번달 내실금액(원금)' 사용
+    // - 일시불: 할인 적용 후 실결제 금액
+    // - 할부: 이번 달 분할 납부 금액
+    // - 해외: KRW 환산 금액
+    const amount = parseAmount(row[6] ?? '0');
 
-    if (isOverseas(rawAmount)) {
-      // 해외 결제: col[6]의 KRW 환산 금액 사용
-      amount = parseAmount(row[6] ?? '0');
-    } else {
-      amount = parseAmount(rawAmount);
-    }
-
-    // 음수(취소) 또는 0 스킵
+    // 음수(취소) 또는 0 스킵 (예: 할부 취소 건은 내실금액 0)
     if (isNaN(amount) || amount <= 0) continue;
 
     results.push({ date: dateStr, name: merchant, amount });
