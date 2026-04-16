@@ -1,6 +1,11 @@
+import 'package:flutter/foundation.dart';
+
 abstract class Env {
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
-  );
+  static String get apiBaseUrl {
+    const defined = String.fromEnvironment('API_BASE_URL');
+    if (defined.isNotEmpty) return defined;
+    return kReleaseMode
+        ? 'https://assetlog-production.up.railway.app'
+        : 'http://localhost:3000';
+  }
 }
