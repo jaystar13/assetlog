@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/asset_item.dart';
 import '../../models/asset_group.dart';
 import '../../models/enums.dart';
+import '../../utils/date_format.dart';
 import '../providers.dart';
 import 'home_notifier.dart';
 
@@ -10,11 +11,38 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
   @override
   Future<List<AssetGroup>> build(String month) async {
     final service = ref.watch(assetServiceProvider);
-    final rawAssets = await service.getAssets(month: month);
-    return _groupAssets(rawAssets);
+    final prevMonth = _previousMonthKey(month);
+
+    final results = await Future.wait([
+      service.getAssets(month: month),
+      service.getAssets(month: prevMonth).catchError(
+            (_) => <Map<String, dynamic>>[],
+          ),
+    ]);
+    final rawAssets = results[0];
+    final rawPrevAssets = results[1];
+
+    final prevValueById = <String, num>{
+      for (final raw in rawPrevAssets)
+        if ((raw['valueHistory'] as List<dynamic>? ?? []).isNotEmpty)
+          raw['id'] as String:
+              ((raw['valueHistory'] as List<dynamic>).first['value'] as num),
+    };
+
+    return _groupAssets(rawAssets, prevValueById);
   }
 
-  List<AssetGroup> _groupAssets(List<Map<String, dynamic>> rawAssets) {
+  String _previousMonthKey(String month) {
+    final parts = month.split('-');
+    final year = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    return toMonthKey(DateTime(year, m - 1));
+  }
+
+  List<AssetGroup> _groupAssets(
+    List<Map<String, dynamic>> rawAssets,
+    Map<String, num> prevValueById,
+  ) {
     final Map<String, List<AssetItem>> grouped = {};
 
     for (final raw in rawAssets) {
@@ -23,12 +51,13 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
       final latestValue = history.isNotEmpty
           ? (history.first['value'] as num).toInt()
           : 0;
+      final assetId = raw['id'] as String;
 
       final item = AssetItem(
-        id: raw['id'] as String,
+        id: assetId,
         name: raw['name'] as String,
         currentValue: latestValue,
-        previousValue: 0,
+        previousValue: prevValueById[assetId] ?? 0,
         lastUpdated: history.isNotEmpty
             ? history.first['month'] as String
             : '',
