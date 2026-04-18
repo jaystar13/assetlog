@@ -2,7 +2,6 @@ export 'enums.dart';
 export 'asset_item.dart';
 export 'asset_group.dart';
 export 'transaction.dart';
-export 'card_company.dart';
 export 'monthly_data.dart';
 export 'shared_user.dart';
 export 'invitation.dart';

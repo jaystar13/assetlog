@@ -331,11 +331,7 @@ export class ShareGroupsService {
 
     const where: Record<string, unknown> = { id: { in: txIds } };
     if (month) {
-      const [yyyy, mm] = month.split('-').map(Number);
-      where.OR = [
-        { targetMonth: month },
-        { targetMonth: null, date: { gte: new Date(yyyy, mm - 1, 1), lt: new Date(yyyy, mm, 1) } },
-      ];
+      where.targetMonth = month;
     }
 
     // 멤버 정보 (nickname, color) 조회
@@ -348,7 +344,7 @@ export class ShareGroupsService {
     const transactions = await this.prisma.transaction.findMany({
       where,
       include: { user: { select: USER_SELECT } },
-      orderBy: { date: 'desc' },
+      orderBy: [{ targetMonth: 'desc' }, { type: 'asc' }, { category: 'asc' }],
     });
 
     return transactions.map((tx) => {

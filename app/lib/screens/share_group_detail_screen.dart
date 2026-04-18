@@ -448,11 +448,10 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
         children: _transactions.map((raw) {
           final type = raw['type'] as String? ?? 'expense';
           final isIncome = type == 'income';
-          final name = raw['name'] as String? ?? '';
           final amount = (raw['amount'] as num?)?.toInt() ?? 0;
-          final date = raw['date'] as String? ?? '';
           final category = raw['category'] as String? ?? '';
           final subCategory = raw['subCategory'] as String? ?? raw['sub_category'] as String? ?? '';
+          final note = raw['note'] as String? ?? '';
           final ownerId = raw['userId'] as String? ?? raw['user_id'] as String? ?? '';
           final ownerName = memberNicknameMap[ownerId] ?? (raw['user'] as Map?)?['name'] as String? ?? '';
           final ownerColor = memberColorMap[ownerId] ?? AppColors.teal500;
@@ -470,17 +469,13 @@ class _ShareGroupDetailScreenState extends ConsumerState<ShareGroupDetailScreen>
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: AppTypography.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 1),
+                      Text('$category · $subCategory', style: AppTypography.bodyMedium, overflow: TextOverflow.ellipsis, maxLines: 1),
+                      if (note.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(note, style: AppTypography.caption.copyWith(color: AppColors.gray500), overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ],
                       const SizedBox(height: AppSpacing.xs),
                       Row(children: [
-                        Text(category, style: AppTypography.caption),
-                        if (subCategory.isNotEmpty) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(subCategory, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
-                        ],
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(date.length >= 10 ? date.substring(0, 10) : date, style: AppTypography.caption.copyWith(color: AppColors.gray400)),
-                        const SizedBox(width: AppSpacing.sm),
                         Flexible(child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: ownerColor.withValues(alpha: 0.1), borderRadius: AppRadius.fullAll),

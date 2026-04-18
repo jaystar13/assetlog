@@ -137,102 +137,34 @@ enum GroupRole {
 }
 
 // ─── Income / Expense Category ───────────────────────────────────────────────
+// 백엔드 create-transaction.dto.ts의 CATEGORY_SUBCATEGORY_MAP과 반드시 일치.
 
-enum IncomeCategory {
-  salary('급여', '급여');
+const List<String> incomeCategories = [
+  '근로소득',
+  '사업·프리랜서',
+  '금융수익',
+  '부동산수익',
+  '기타수입',
+];
 
-  const IncomeCategory(this.value, this.label);
-  final String value;
-  final String label;
-
-  static IncomeCategory fromString(String s) =>
-      values.firstWhere((e) => e.value == s, orElse: () => salary);
-}
-
-enum ExpenseCategory {
-  living('생활비', '생활비'),
-  essential('필수비', '필수비'),
-  optional('선택비', '선택비'),
-  investment('투자비', '투자비');
-
-  const ExpenseCategory(this.value, this.label);
-  final String value;
-  final String label;
-
-  static ExpenseCategory fromString(String s) =>
-      values.firstWhere((e) => e.value == s, orElse: () => living);
-}
-
-// ─── Category - SubCategory Map ──────────────────────────────────────────────
+const List<String> expenseCategories = [
+  '생활비',
+  '필수비',
+  '선택비',
+  '투자비',
+];
 
 const Map<String, List<String>> categorySubCategoryMap = {
-  '급여': ['급여', '인센티브', 'PI', '정산환급', '연차보상'],
-  '생활비': ['생활', '주유'],
-  '필수비': ['교육', '교통', '의료', '통신', '주거(관리비)', '세금', '경조사', '명절'],
-  '선택비': ['여행', '문화'],
-  '투자비': ['구독(AI)', '구독(인프라)', '대출(원금)', '대출(이자)'],
+  // 수입
+  '근로소득': ['급여', '인센티브', '상여', '기타'],
+  '사업·프리랜서': ['사업소득', '프리랜서', '기타'],
+  '금융수익': ['배당', '이자', '매매차익', '기타'],
+  '부동산수익': ['임대료', '매매차익', '기타'],
+  '기타수입': ['기타'],
+  // 지출
+  '생활비': ['식비', '카페·간식', '쇼핑·의류', '외식·술자리', '기타생활'],
+  '필수비': ['주거·관리비', '교통·통신', '교육', '건강·의료', '보험', '기타필수'],
+  '선택비': ['여가·취미', '여행', '구독서비스', '경조사', '기타선택'],
+  '투자비': ['저축·예적금', '주식·펀드', '부동산', '기타투자'],
 };
-
-// ─── Income Source (소득 구분) ───────────────────────────────────────────────
-
-enum IncomeSource {
-  earned('근로소득', '근로소득'),
-  business('사업소득', '사업소득'),
-  interest('이자소득', '이자소득'),
-  dividend('배당소득', '배당소득'),
-  rental('임대소득', '임대소득'),
-  pension('연금소득', '연금소득'),
-  other('기타소득', '기타소득');
-
-  const IncomeSource(this.value, this.label);
-  final String value;
-  final String label;
-
-  static IncomeSource fromString(String s) =>
-      values.firstWhere((e) => e.value == s, orElse: () => earned);
-}
-
-// ─── Payment Method (지불 방법) ─────────────────────────────────────────────
-// payment-method.constants.ts (백엔드)와 value 값이 반드시 일치해야 합니다.
-
-enum PaymentMethod {
-  // 신용카드
-  shinhan('신한카드'),
-  kbNational('KB국민카드'),
-  hyundai('현대카드'),
-  samsung('삼성카드'),
-  lotte('롯데카드'),
-  hana('하나카드'),
-  nhNongHyup('NH농협카드'),
-  woori('우리카드'),
-  bc('BC카드'),
-  // 카드 외
-  bankTransfer('계좌이체'),
-  cash('현금');
-
-  const PaymentMethod(this.value);
-  final String value;
-
-  static PaymentMethod? fromString(String s) =>
-      values.where((e) => e.value == s).firstOrNull;
-}
-
-// 카드사 목록 (지출 - 신용카드 선택 시 사용)
-const List<PaymentMethod> cardCompanies = [
-  PaymentMethod.shinhan,
-  PaymentMethod.kbNational,
-  PaymentMethod.hyundai,
-  PaymentMethod.samsung,
-  PaymentMethod.lotte,
-  PaymentMethod.hana,
-  PaymentMethod.nhNongHyup,
-  PaymentMethod.woori,
-  PaymentMethod.bc,
-];
-
-// 카드 외 지출 수단
-const List<PaymentMethod> expensePaymentMethods = [
-  PaymentMethod.bankTransfer,
-  PaymentMethod.cash,
-];
 

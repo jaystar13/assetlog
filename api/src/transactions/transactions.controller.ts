@@ -34,7 +34,10 @@ export class TransactionsController {
   }
 
   @Post()
-  @ApiOperation({ summary: '수입/지출 추가' })
+  @ApiOperation({
+    summary:
+      '수입/지출 추가 (같은 월·카테고리·세부분류 조합도 별도 행으로 누적 저장)',
+  })
   create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateTransactionDto,

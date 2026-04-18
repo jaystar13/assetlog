@@ -95,28 +95,22 @@ model AssetValueHistory {
 }
 
 // ─── Transaction ─────────────────────────────────────────────────────────────
+// 월별 (카테고리, 세부분류) 입력 — 같은 조합도 입력할 때마다 누적 저장.
+// UI에서 세부분류 단위로 합산해 표시하며, 펼치면 개별 입력 이력이 보인다.
 
 model Transaction {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type              String   // "income" | "expense"
-  name              String
-  amount            Int
-  date              DateTime
-  category          String
-  subCategory       String   @map("sub_category")
-  paymentMethod     String?  @map("payment_method")
-  targetMonth       String?  @map("target_month")
-  isInstallment     Boolean  @default(false) @map("is_installment")
-  installmentMonths Int?     @map("installment_months")
-  installmentRound  Int?     @map("installment_round")
-  editedByUserId    String?  @map("edited_by_user_id")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "income" | "expense"
+  targetMonth String   @map("target_month") // "YYYY-MM"
+  category    String
+  subCategory String   @map("sub_category")
+  amount      Int
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@index([userId, date])
-  @@index([userId, type])
   @@index([userId, targetMonth])
   @@map("transactions")
 }

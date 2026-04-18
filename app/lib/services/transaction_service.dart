@@ -28,16 +28,14 @@ class TransactionService with ApiResponseUnwrapper {
     }
   }
 
-  /// POST /transactions
+  /// POST /transactions — upsert (same month+category+subCategory merges).
   Future<Transaction> createTransaction({
     required String type,
-    required String name,
-    required int amount,
-    required String date,
+    required String targetMonth,
     required String category,
     required String subCategory,
-    String? paymentMethod,
-    String? targetMonth,
+    required int amount,
+    String? note,
     List<String>? shareGroupIds,
   }) async {
     try {
@@ -45,13 +43,11 @@ class TransactionService with ApiResponseUnwrapper {
         '/transactions',
         data: {
           'type': type,
-          'name': name,
-          'amount': amount,
-          'date': date,
+          'targetMonth': targetMonth,
           'category': category,
           'subCategory': subCategory,
-          'paymentMethod': ?paymentMethod,
-          'targetMonth': ?targetMonth,
+          'amount': amount,
+          'note': ?note,
           'shareGroupIds': ?shareGroupIds,
         },
       );
@@ -61,7 +57,7 @@ class TransactionService with ApiResponseUnwrapper {
     }
   }
 
-  /// PATCH /transactions/:id
+  /// PATCH /transactions/:id — 금액/비고만 수정 가능.
   Future<Transaction> updateTransaction(
     String id,
     Map<String, dynamic> data,
@@ -96,25 +92,4 @@ class TransactionService with ApiResponseUnwrapper {
       throw ApiException.fromDioException(e);
     }
   }
-
-  /// POST /import/transactions — 카드 명세서 일괄 업로드
-  Future<Map<String, dynamic>> importTransactions({
-    required String cardCompany,
-    required String targetMonth,
-    required String filePath,
-    required String fileName,
-  }) async {
-    try {
-      final formData = FormData.fromMap({
-        'cardCompany': cardCompany,
-        'targetMonth': targetMonth,
-        'file': await MultipartFile.fromFile(filePath, filename: fileName),
-      });
-      final response = await _dio.post('/import/transactions', data: formData);
-      return unwrap(response);
-    } on DioException catch (e) {
-      throw ApiException.fromDioException(e);
-    }
-  }
-
 }

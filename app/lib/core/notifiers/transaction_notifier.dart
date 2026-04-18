@@ -16,24 +16,20 @@ class TransactionNotifier extends AutoDisposeFamilyAsyncNotifier<List<Transactio
 
   Future<void> addTransaction({
     required String type,
-    required String name,
-    required int amount,
-    required String date,
+    required String targetMonth,
     required String category,
     required String subCategory,
-    String? paymentMethod,
-    String? targetMonth,
+    required int amount,
+    String? note,
     List<String>? shareGroupIds,
   }) async {
     await _service.createTransaction(
       type: type,
-      name: name,
-      amount: amount,
-      date: date,
+      targetMonth: targetMonth,
       category: category,
       subCategory: subCategory,
-      paymentMethod: paymentMethod,
-      targetMonth: targetMonth,
+      amount: amount,
+      note: note,
       shareGroupIds: shareGroupIds,
     );
     _invalidateAll();

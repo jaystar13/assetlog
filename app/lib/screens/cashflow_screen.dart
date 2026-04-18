@@ -14,12 +14,10 @@ import '../design_system/components/al_screen_header.dart';
 import '../models/models.dart';
 import '../core/notifiers/transaction_notifier.dart';
 import '../core/providers.dart';
-import '../repositories/repositories.dart';
 import '../utils/format_korean_won.dart';
 import '../utils/date_format.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/cashflow/manual_entry_form.dart';
-import '../widgets/cashflow/import_sheet_content.dart';
 
 /// 공유 그룹의 거래 데이터를 가져오는 Provider.
 /// 파라미터: 'groupId_YYYY-MM' 형식의 키.
@@ -29,7 +27,9 @@ final _sharedTransactionsProvider = FutureProvider.autoDispose
   if (parts.length < 2) return [];
   final groupId = parts[0];
   final month = parts[1];
-  return ref.watch(shareGroupServiceProvider).getGroupTransactions(groupId, month: month);
+  return ref
+      .watch(shareGroupServiceProvider)
+      .getGroupTransactions(groupId, month: month);
 });
 
 class CashFlowScreen extends ConsumerStatefulWidget {
@@ -41,7 +41,6 @@ class CashFlowScreen extends ConsumerStatefulWidget {
 
 class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   DateTime _selectedMonth = DateTime.now();
-  final _cardCompanies = CashflowRepository().getCardCompanies();
 
   // 그룹 전환 (null = 내 데이터)
   String? _selectedGroupId;
@@ -49,31 +48,45 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   List<Map<String, dynamic>> _myGroups = [];
   bool _groupsLoaded = false;
 
+  // 필터
+  TransactionType? _txFilter;
+
+  // 카테고리 그룹 펼침 상태 (1단계: 카테고리)
+  final Set<String> _expandedGroups = {};
+  // 세부분류 집계 펼침 상태 (2단계: 세부분류 — 개별 이력 보기)
+  final Set<String> _expandedSubGroups = {};
+
+  // 다중 선택 모드
+  bool _isSelectMode = false;
+  final Set<String> _selectedIds = {};
+
   @override
   void initState() {
     super.initState();
     _loadGroups();
   }
 
-  // 거래 내역 필터
-  TransactionType? _txFilter;
+  String get _monthKey => toMonthKey(_selectedMonth);
 
-  // 카드 사용 내역 펼침
-  bool _showCardUsage = false;
+  bool get _isGroupMode => _selectedGroupId != null;
 
-  // 거래 그룹 펼침 상태
-  final Set<String> _expandedTxGroups = {};
-
-  // 다중 선택 모드
-  bool _isSelectMode = false;
-  final Set<String> _selectedIds = {};
+  Future<void> _loadGroups() async {
+    if (_groupsLoaded) return;
+    _groupsLoaded = true;
+    try {
+      final groups = await ref.read(shareGroupServiceProvider).getMyGroups();
+      if (mounted) setState(() => _myGroups = groups);
+    } catch (_) {
+      /* 공유 데이터 로딩 실패 시 무시 */
+    }
+  }
 
   void _toggleSelectMode({List<String>? allGroupKeys}) {
     setState(() {
       _isSelectMode = !_isSelectMode;
       _selectedIds.clear();
       if (_isSelectMode && allGroupKeys != null) {
-        _expandedTxGroups.addAll(allGroupKeys);
+        _expandedGroups.addAll(allGroupKeys);
       }
     });
   }
@@ -106,9 +119,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       message: '선택한 $count건의 거래를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
       onConfirm: () async {
         try {
-          final notifier = ref.read(
-            transactionNotifierProvider(_monthKey).notifier,
-          );
+          final notifier =
+              ref.read(transactionNotifierProvider(_monthKey).notifier);
           final deleted = await notifier.batchDeleteTransactions(
             _selectedIds.toList(),
           );
@@ -126,12 +138,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  String get _monthKey => toMonthKey(_selectedMonth);
-
-  List<Transaction> _filterTransactions(List<Transaction> transactions) =>
-      _txFilter == null
-      ? transactions
-      : transactions.where((t) => t.type == _txFilter).toList();
+  List<Transaction> _filter(List<Transaction> txs) => _txFilter == null
+      ? txs
+      : txs.where((t) => t.type == _txFilter).toList();
 
   int _totalIncome(List<Transaction> txs) => txs
       .where((t) => t.type == TransactionType.income)
@@ -143,46 +152,51 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
 
   void _goToPreviousMonth() {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month - 1);
     });
   }
 
   void _goToNextMonth() {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     });
   }
 
   void _showManualEntrySheet() async {
-    // 그룹 목록 가져오기
     List<Map<String, dynamic>> groups = [];
     try {
       groups = await ref.read(shareGroupServiceProvider).getMyGroups();
-    } catch (_) { /* 공유 데이터 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
-
+    } catch (_) {/* ignore */}
     if (!mounted) return;
 
     AlBottomSheet.show(
       context: context,
       title: '수기 입력',
       child: ManualEntryForm(
+        targetMonth: _monthKey,
         shareGroups: groups,
         onSubmit: (entry) async {
           Navigator.of(context).pop();
           final shareGroupIds = (entry['shareGroupIds'] as List<String>?) ?? [];
-          await ref
-              .read(transactionNotifierProvider(_monthKey).notifier)
-              .addTransaction(
-                type: entry['type'] as String,
-                name: entry['name'] as String,
-                amount: entry['amount'] as int,
-                date: entry['date'] as String,
-                category: entry['category'] as String,
-                subCategory: entry['subCategory'] as String,
-                paymentMethod: entry['paymentMethod'] as String?,
-                shareGroupIds: shareGroupIds.isNotEmpty ? shareGroupIds : null,
-              );
-          if (mounted) showSuccessSnackBar(context, '거래가 추가되었습니다');
+          try {
+            await ref
+                .read(transactionNotifierProvider(_monthKey).notifier)
+                .addTransaction(
+                  type: entry['type'] as String,
+                  targetMonth: entry['targetMonth'] as String,
+                  category: entry['category'] as String,
+                  subCategory: entry['subCategory'] as String,
+                  amount: entry['amount'] as int,
+                  note: entry['note'] as String?,
+                  shareGroupIds:
+                      shareGroupIds.isNotEmpty ? shareGroupIds : null,
+                );
+            if (mounted) showSuccessSnackBar(context, '저장되었습니다');
+          } catch (e) {
+            if (mounted) showErrorSnackBar(context, '저장 실패: $e');
+          }
         },
       ),
     );
@@ -195,68 +209,46 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
       final service = ref.read(shareGroupServiceProvider);
       groups = await service.getMyGroups();
       currentGroupIds = await service.getItemSharedGroups('transaction', tx.id);
-    } catch (_) { /* 공유 데이터 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
+    } catch (_) {/* ignore */}
     if (!mounted) return;
 
     AlBottomSheet.show(
       context: context,
       title: '거래 수정',
       child: ManualEntryForm(
+        targetMonth: tx.targetMonth,
         initialData: tx.toMap(),
         shareGroups: groups,
         initialShareGroupIds: currentGroupIds,
         onSubmit: (updated) async {
           Navigator.of(context).pop();
-          const allowedFields = {
-            'type',
-            'name',
-            'amount',
-            'date',
-            'category',
-            'subCategory',
-            'paymentMethod',
-            'targetMonth',
-            'isInstallment',
-            'installmentMonths',
-            'installmentRound',
-          };
-          final payload = Map<String, dynamic>.fromEntries(
-            updated.entries.where((e) => allowedFields.contains(e.key)),
-          );
-          await ref
-              .read(transactionNotifierProvider(_monthKey).notifier)
-              .updateTransaction(tx.id, payload);
-
-          // 공유 그룹 변경
-          final shareGroupIds =
-              (updated['shareGroupIds'] as List<String>?) ?? [];
-          if (shareGroupIds.isNotEmpty) {
-            try {
-              await ref.read(shareGroupServiceProvider).shareItems(
-                shareGroupIds.first,
-                [
-                  {'itemType': 'transaction', 'itemId': tx.id},
-                ],
-              );
-            } catch (_) { /* 공유 데이터 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
+          try {
+            await ref
+                .read(transactionNotifierProvider(_monthKey).notifier)
+                .updateTransaction(tx.id, {
+              'amount': updated['amount'],
+              'note': updated['note'],
+            });
+            final shareGroupIds =
+                (updated['shareGroupIds'] as List<String>?) ?? [];
+            if (shareGroupIds.isNotEmpty) {
+              try {
+                await ref.read(shareGroupServiceProvider).shareItems(
+                  shareGroupIds.first,
+                  [
+                    {'itemType': 'transaction', 'itemId': tx.id},
+                  ],
+                );
+              } catch (_) {/* ignore */}
+            }
+            if (mounted) showSuccessSnackBar(context, '수정되었습니다');
+          } catch (e) {
+            if (mounted) showErrorSnackBar(context, '수정 실패: $e');
           }
-
-          if (mounted) showSuccessSnackBar(context, '거래가 수정되었습니다');
         },
       ),
     );
   }
-
-  Future<void> _loadGroups() async {
-    if (_groupsLoaded) return;
-    _groupsLoaded = true;
-    try {
-      final groups = await ref.read(shareGroupServiceProvider).getMyGroups();
-      if (mounted) setState(() => _myGroups = groups);
-    } catch (_) { /* 공유 데이터 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
-  }
-
-  bool get _isGroupMode => _selectedGroupId != null;
 
   void _showGroupSelector() {
     showModalBottomSheet(
@@ -277,11 +269,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               ),
               title: Text('나', style: AppTypography.bodyLarge),
               trailing: _selectedGroupId == null
-                  ? Icon(
-                      LucideIcons.check,
-                      size: 18,
-                      color: AppColors.emerald600,
-                    )
+                  ? Icon(LucideIcons.check,
+                      size: 18, color: AppColors.emerald600)
                   : null,
               onTap: () {
                 setState(() {
@@ -300,15 +289,13 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               return ListTile(
                 leading: Icon(
                   LucideIcons.users,
-                  color: isSelected ? AppColors.emerald600 : AppColors.gray500,
+                  color:
+                      isSelected ? AppColors.emerald600 : AppColors.gray500,
                 ),
                 title: Text(displayName, style: AppTypography.bodyLarge),
                 trailing: isSelected
-                    ? Icon(
-                        LucideIcons.check,
-                        size: 18,
-                        color: AppColors.emerald600,
-                      )
+                    ? Icon(LucideIcons.check,
+                        size: 18, color: AppColors.emerald600)
                     : null,
                 onTap: () {
                   setState(() {
@@ -333,68 +320,55 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         children: [
           AlScreenHeader(
             title: '수입/지출 관리',
-            subtitle: '매월 수입과 지출을 관리하세요',
-            action: _myGroups.isNotEmpty
-                ? GestureDetector(
-                    onTap: _showGroupSelector,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _isGroupMode
-                            ? AppColors.emerald50
-                            : AppColors.gray50,
-                        borderRadius: AppRadius.fullAll,
-                        border: Border.all(
-                          color: _isGroupMode
-                              ? AppColors.emerald500
-                              : AppColors.gray200,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _isGroupMode ? LucideIcons.users : LucideIcons.user,
-                            size: 14,
-                            color: _isGroupMode
-                                ? AppColors.emerald600
-                                : AppColors.gray600,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            _selectedGroupName,
-                            style: AppTypography.bodySmall.copyWith(
-                              color: _isGroupMode
-                                  ? AppColors.emerald700
-                                  : AppColors.gray600,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            LucideIcons.chevronDown,
-                            size: 12,
-                            color: AppColors.gray400,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : null,
+            subtitle: '매월 카테고리별 합계를 기록하세요',
+            action: _myGroups.isNotEmpty ? _buildGroupChip() : null,
           ),
-
-          // Month selector
           AlMonthSelector(
             selectedMonth: _selectedMonth,
             onPrevious: _goToPreviousMonth,
             onNext: _goToNextMonth,
           ),
-
-          // Scrollable content
           Expanded(child: _buildContent()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGroupChip() {
+    return GestureDetector(
+      onTap: _showGroupSelector,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _isGroupMode ? AppColors.emerald50 : AppColors.gray50,
+          borderRadius: AppRadius.fullAll,
+          border: Border.all(
+            color:
+                _isGroupMode ? AppColors.emerald500 : AppColors.gray200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_isGroupMode ? LucideIcons.users : LucideIcons.user,
+                size: 14,
+                color: _isGroupMode
+                    ? AppColors.emerald600
+                    : AppColors.gray600),
+            SizedBox(width: 6),
+            Text(
+              _selectedGroupName,
+              style: AppTypography.bodySmall.copyWith(
+                color: _isGroupMode
+                    ? AppColors.emerald700
+                    : AppColors.gray600,
+              ),
+            ),
+            SizedBox(width: 4),
+            Icon(LucideIcons.chevronDown,
+                size: 12, color: AppColors.gray400),
+          ],
+        ),
       ),
     );
   }
@@ -432,8 +406,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             ),
           ),
           data: (transactions) {
-            final filtered = _filterTransactions(transactions);
-            // 월간 요약은 내 데이터만
+            final filtered = _filter(transactions);
             final income = _totalIncome(transactions);
             final expense = _totalExpense(transactions);
             final balance = income - expense;
@@ -454,93 +427,21 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     expense: expense,
                     balance: balance,
                     expenseRatio: expenseRatio,
-                    transactions: transactions,
                   ),
                   const SizedBox(height: AppSpacing.sectionGap),
-                  SmartImportCard(onTap: _showImportSheet),
-                  const SizedBox(height: AppSpacing.lg),
                   AlButton(
                     label: '수기 입력',
                     onPressed: _showManualEntrySheet,
-                    icon: Icon(LucideIcons.plus, size: 18, color: Colors.white),
+                    icon:
+                        Icon(LucideIcons.plus, size: 18, color: Colors.white),
                   ),
                   const SizedBox(height: AppSpacing.sectionGap),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('거래 내역', style: AppTypography.heading3),
-                      Row(
-                        children: [
-                          if (_isSelectMode && filtered.isNotEmpty) ...[
-                            GestureDetector(
-                              onTap: () => _selectAll(filtered),
-                              child: Text(
-                                _selectedIds.length == filtered.length
-                                    ? '전체 해제'
-                                    : '전체 선택',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.emerald600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                          ],
-                          if (filtered.isNotEmpty)
-                            GestureDetector(
-                              onTap: () => _toggleSelectMode(
-                                allGroupKeys: _getGroupKeys(filtered),
-                              ),
-                              child: Text(
-                                _isSelectMode ? '취소' : '선택',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: _isSelectMode
-                                      ? AppColors.gray500
-                                      : AppColors.emerald600,
-                                ),
-                              ),
-                            ),
-                          if (!_isSelectMode) ...[
-                            const SizedBox(width: AppSpacing.md),
-                            _buildTxFilterSegment(),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
+                  _buildListHeader(filtered),
                   const SizedBox(height: AppSpacing.md),
-                  if (filtered.isEmpty &&
-                      !(_isGroupMode && _sharedTransactions.isNotEmpty))
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Icon(
-                              LucideIcons.inbox,
-                              size: 48,
-                              color: AppColors.gray300,
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              '거래 내역이 없습니다',
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: AppColors.gray500,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              '수기 입력 또는 명세서 가져오기로 추가해 보세요',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.gray400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                  if (filtered.isEmpty)
+                    _buildEmptyState()
                   else
-                    ..._buildGroupedTransactions(filtered),
-                  // 선택 모드 삭제 바
+                    ..._buildCategoryGroups(filtered),
                   if (_isSelectMode && _selectedIds.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.only(top: AppSpacing.lg),
@@ -560,6 +461,75 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             );
           },
         );
+  }
+
+  Widget _buildListHeader(List<Transaction> filtered) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('내역', style: AppTypography.heading3),
+        Row(
+          children: [
+            if (_isSelectMode && filtered.isNotEmpty) ...[
+              GestureDetector(
+                onTap: () => _selectAll(filtered),
+                child: Text(
+                  _selectedIds.length == filtered.length ? '전체 해제' : '전체 선택',
+                  style: AppTypography.bodySmall
+                      .copyWith(color: AppColors.emerald600),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+            ],
+            if (filtered.isNotEmpty)
+              GestureDetector(
+                onTap: () => _toggleSelectMode(
+                  allGroupKeys: _getGroupKeys(filtered),
+                ),
+                child: Text(
+                  _isSelectMode ? '취소' : '선택',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: _isSelectMode
+                        ? AppColors.gray500
+                        : AppColors.emerald600,
+                  ),
+                ),
+              ),
+            if (!_isSelectMode) ...[
+              const SizedBox(width: AppSpacing.md),
+              _buildTxFilterSegment(),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(LucideIcons.inbox, size: 48, color: AppColors.gray300),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              '내역이 없습니다',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.gray500,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '수기 입력으로 카테고리별 합계를 기록해 보세요',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.gray400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTxFilterSegment() {
@@ -608,42 +578,13 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     required int expense,
     required int balance,
     required double expenseRatio,
-    required List<Transaction> transactions,
   }) {
-    // 카드 사용 내역 집계
-    final cardTxs = transactions
-        .where(
-          (t) =>
-              t.type == TransactionType.expense &&
-              t.paymentMethod != null &&
-              t.paymentMethod!.contains('카드'),
-        )
-        .toList();
-    final Map<String, int> byCard = {};
-    for (final tx in cardTxs) {
-      byCard[tx.paymentMethod!] = (byCard[tx.paymentMethod!] ?? 0) + tx.amount;
-    }
-    final sortedCards = byCard.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final cardTotal = sortedCards.fold<int>(0, (sum, e) => sum + e.value);
-    final hasCardData = sortedCards.isNotEmpty;
-
-    final cardColors = [
-      AppColors.blue600,
-      AppColors.emerald500,
-      AppColors.purple600,
-      Color(0xFFF59E0B),
-      AppColors.teal500,
-      AppColors.red600,
-    ];
-
     return AlCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('월간 요약', style: AppTypography.heading3),
           const SizedBox(height: AppSpacing.lg),
-
           Row(
             children: [
               Expanded(
@@ -679,18 +620,17 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-
           ClipRRect(
             borderRadius: AppRadius.fullAll,
             child: LinearProgressIndicator(
               value: expenseRatio.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.green100,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.red600),
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(AppColors.red600),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -698,169 +638,49 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
               Text(
                 formatKoreanWon(balance),
                 style: AppTypography.amountSmall.copyWith(
-                  color: balance >= 0 ? AppColors.emerald600 : AppColors.red600,
+                  color: balance >= 0
+                      ? AppColors.emerald600
+                      : AppColors.red600,
                 ),
               ),
             ],
           ),
-
-          // 카드 사용 내역 토글
-          if (hasCardData) ...[
-            const SizedBox(height: AppSpacing.md),
-            GestureDetector(
-              onTap: () => setState(() => _showCardUsage = !_showCardUsage),
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: AppColors.gray100)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.credit_card, size: 14, color: AppColors.gray500),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      _showCardUsage ? '카드 사용 내역 접기' : '카드 사용 내역 보기',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.gray500,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Icon(
-                      _showCardUsage
-                          ? LucideIcons.chevronUp
-                          : LucideIcons.chevronDown,
-                      size: 14,
-                      color: AppColors.gray500,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            AnimatedCrossFade(
-              firstChild: SizedBox.shrink(),
-              secondChild: Padding(
-                padding: EdgeInsets.only(top: AppSpacing.md),
-                child: Column(
-                  children: [
-                    ...sortedCards.asMap().entries.map((e) {
-                      final idx = e.key;
-                      final entry = e.value;
-                      final pct = cardTotal > 0 ? entry.value / cardTotal : 0.0;
-                      final color = cardColors[idx % cardColors.length];
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                entry.key,
-                                style: AppTypography.bodySmall,
-                              ),
-                            ),
-                            Text(
-                              formatKoreanWon(entry.value),
-                              style: AppTypography.bodySmall.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            SizedBox(
-                              width: 32,
-                              child: Text(
-                                '${(pct * 100).round()}%',
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.gray500,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    Divider(height: 1, color: AppColors.gray100),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '카드 합계',
-                          style: AppTypography.label.copyWith(fontSize: 12),
-                        ),
-                        Text(
-                          formatKoreanWon(cardTotal),
-                          style: AppTypography.label.copyWith(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              crossFadeState: _showCardUsage
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: Duration(milliseconds: 250),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  void _showImportSheet() {
-    AlBottomSheet.show(
-      context: context,
-      title: '명세서 가져오기',
-      maxHeightFraction: 0.85,
-      child: ImportSheetContent(
-        cardCompanies: _cardCompanies,
-        targetMonth: _monthKey,
-        onImport: ref.read(transactionServiceProvider).importTransactions,
-        onSuccess: () => ref.invalidate(transactionNotifierProvider(_monthKey)),
-      ),
-    );
+  // 공유 거래의 소유자 정보 (txId → {name, nickname, color})
+  final Map<String, ({String name, String? nickname, String? color})>
+      _sharedTxOwners = {};
+
+  // 작성자별 색상 매핑
+  static const _ownerColors = [
+    AppColors.teal500,
+    AppColors.purple600,
+    AppColors.blue600,
+    Color(0xFFF59E0B),
+    AppColors.red600,
+  ];
+  final Map<String, Color> _ownerColorMap = {};
+
+  Color _getOwnerColor(String ownerName) {
+    return _ownerColorMap.putIfAbsent(ownerName, () {
+      return _ownerColors[_ownerColorMap.length % _ownerColors.length];
+    });
   }
 
-  /// 그룹핑된 거래를 그룹 키 목록과 함께 반환 (선택 모드에서 사용)
   List<String> _getGroupKeys(List<Transaction> transactions) {
     final keys = <String>[];
-    final incomes = transactions
-        .where((t) => t.type == TransactionType.income)
-        .toList();
-    final expenses = transactions
-        .where((t) => t.type == TransactionType.expense)
-        .toList();
-    for (final tx in incomes) {
-      final key = 'income_${tx.paymentMethod ?? '기타소득'}';
-      if (!keys.contains(key)) keys.add(key);
-    }
-    for (final tx in expenses) {
-      final method = tx.paymentMethod;
-      final label = (method != null && method.contains('카드'))
-          ? method
-          : (method ?? '기타');
-      final key = 'expense_$label';
+    for (final tx in transactions) {
+      final key = '${tx.type.value}_${tx.category}';
       if (!keys.contains(key)) keys.add(key);
     }
     return keys;
   }
 
-  // 공유 거래의 소유자 정보 (txId → {name, nickname, color})
-  final Map<String, ({String name, String? nickname, String? color})>
-  _sharedTxOwners = {};
-
-  List<Widget> _buildGroupedTransactions(List<Transaction> myTransactions) {
+  /// 카테고리별 그룹핑 (1단계 카테고리 기준)
+  List<Widget> _buildCategoryGroups(List<Transaction> myTransactions) {
     // 그룹 모드일 때 공유 거래를 합침
     final transactions = [...myTransactions];
     _sharedTxOwners.clear();
@@ -868,16 +688,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     if (_isGroupMode && _sharedTransactions.isNotEmpty) {
       for (final raw in _sharedTransactions) {
         final txId = raw['id'] as String;
-        // 내 거래와 중복 제거
         if (myTransactions.any((t) => t.id == txId)) continue;
         try {
-          // subCategory가 snake_case일 수 있으므로 fallback 처리
-          final normalized = Map<String, dynamic>.from(raw);
-          if (!normalized.containsKey('subCategory') &&
-              normalized.containsKey('sub_category')) {
-            normalized['subCategory'] = normalized['sub_category'];
-          }
-          final tx = Transaction.fromMap(normalized);
+          final tx = Transaction.fromMap(raw);
           transactions.add(tx);
           final owner = raw['user'] as Map<String, dynamic>? ?? {};
           _sharedTxOwners[txId] = (
@@ -885,85 +698,82 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             nickname: raw['_nickname'] as String?,
             color: raw['_color'] as String?,
           );
-        } catch (_) { /* 공유 데이터 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
+        } catch (_) {/* ignore */}
       }
     }
 
     if (transactions.isEmpty) return [];
 
+    // type 분리 후, type별로 category 그룹핑
     final incomes = transactions
         .where((t) => t.type == TransactionType.income)
         .toList();
     final expenses = transactions
         .where((t) => t.type == TransactionType.expense)
         .toList();
-    final showIncome = _txFilter == null || _txFilter == TransactionType.income;
+    final showIncome =
+        _txFilter == null || _txFilter == TransactionType.income;
     final showExpense =
         _txFilter == null || _txFilter == TransactionType.expense;
 
     final widgets = <Widget>[];
 
-    // 수입: 소득 구분별
     if (showIncome && incomes.isNotEmpty) {
-      final grouped = <String, List<Transaction>>{};
-      for (final tx in incomes) {
-        final key = tx.paymentMethod ?? '기타소득';
-        grouped.putIfAbsent(key, () => []).add(tx);
-      }
-      for (final entry in grouped.entries) {
-        final groupKey = 'income_${entry.key}';
-        final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
-        widgets.add(
-          _buildTxGroupCard(
-            groupKey,
-            entry.key,
-            entry.value,
-            groupTotal,
-            AppColors.emerald600,
-          ),
-        );
-      }
+      widgets.add(_buildSectionLabel('수입', AppColors.green600));
+      widgets.addAll(_groupByCategory(incomes, AppColors.emerald600));
     }
-
-    // 지출: 지불 방법별
     if (showExpense && expenses.isNotEmpty) {
-      final grouped = <String, List<Transaction>>{};
-      for (final tx in expenses) {
-        final method = tx.paymentMethod;
-        final label = (method != null && method.contains('카드'))
-            ? method
-            : (method ?? '기타');
-        grouped.putIfAbsent(label, () => []).add(tx);
-      }
-      for (final entry in grouped.entries) {
-        final groupKey = 'expense_${entry.key}';
-        final groupTotal = entry.value.fold<int>(0, (sum, t) => sum + t.amount);
-        widgets.add(
-          _buildTxGroupCard(
-            groupKey,
-            entry.key,
-            entry.value,
-            groupTotal,
-            AppColors.red600,
-          ),
-        );
-      }
+      widgets.add(_buildSectionLabel('지출', AppColors.red600));
+      widgets.addAll(_groupByCategory(expenses, AppColors.red600));
     }
-
     return widgets;
   }
 
-  Widget _buildTxGroupCard(
+  Widget _buildSectionLabel(String text, Color color) {
+    return Padding(
+      padding: EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+      child: Text(
+        text,
+        style: AppTypography.label.copyWith(color: color),
+      ),
+    );
+  }
+
+  /// type별로 필터된 거래들을 1단계 카테고리 기준으로 묶어 카드 목록을 반환
+  List<Widget> _groupByCategory(List<Transaction> items, Color color) {
+    // 카테고리 출현 순서 (incomeCategories/expenseCategories의 정의 순서)
+    final grouped = <String, List<Transaction>>{};
+    for (final tx in items) {
+      grouped.putIfAbsent(tx.category, () => []).add(tx);
+    }
+
+    // 공식 카테고리 순서대로 정렬, 그 외는 뒤에
+    final orderedKeys = <String>[
+      ...incomeCategories.where(grouped.containsKey),
+      ...expenseCategories.where(grouped.containsKey),
+    ];
+    for (final k in grouped.keys) {
+      if (!orderedKeys.contains(k)) orderedKeys.add(k);
+    }
+
+    return orderedKeys.map((cat) {
+      final list = grouped[cat]!;
+      final groupKey = '${list.first.type.value}_$cat';
+      final total = list.fold<int>(0, (s, t) => s + t.amount);
+      return _buildCategoryCard(groupKey, cat, list, total, color);
+    }).toList();
+  }
+
+  Widget _buildCategoryCard(
     String groupKey,
-    String label,
+    String category,
     List<Transaction> items,
     int total,
     Color color,
   ) {
-    final isExpanded = _expandedTxGroups.contains(groupKey) || _isSelectMode;
-    final myCount = items
-        .where((t) => !_sharedTxOwners.containsKey(t.id))
-        .length;
+    final isExpanded = _expandedGroups.contains(groupKey) || _isSelectMode;
+    final myCount =
+        items.where((t) => !_sharedTxOwners.containsKey(t.id)).length;
     final sharedCount = items.length - myCount;
 
     return Padding(
@@ -972,17 +782,16 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            // 그룹 헤더
             InkWell(
               onTap: _isSelectMode
                   ? null
                   : () => setState(() {
-                      if (_expandedTxGroups.contains(groupKey)) {
-                        _expandedTxGroups.remove(groupKey);
-                      } else {
-                        _expandedTxGroups.add(groupKey);
-                      }
-                    }),
+                        if (_expandedGroups.contains(groupKey)) {
+                          _expandedGroups.remove(groupKey);
+                        } else {
+                          _expandedGroups.add(groupKey);
+                        }
+                      }),
               borderRadius: isExpanded
                   ? BorderRadius.only(
                       topLeft: Radius.circular(AppRadius.lg),
@@ -1012,7 +821,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label, style: AppTypography.label),
+                          Text(category, style: AppTypography.label),
                           SizedBox(height: 2),
                           Row(
                             children: [
@@ -1033,7 +842,8 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     ),
                     Text(
                       formatKoreanWon(total),
-                      style: AppTypography.amountSmall.copyWith(color: color),
+                      style:
+                          AppTypography.amountSmall.copyWith(color: color),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     AnimatedRotation(
@@ -1049,13 +859,12 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                 ),
               ),
             ),
-            // 펼쳐진 거래 목록
             AnimatedCrossFade(
               firstChild: SizedBox.shrink(),
               secondChild: Column(
                 children: [
                   Divider(height: 1, color: AppColors.gray100),
-                  ...items.map((tx) => _buildInlineTransactionItem(tx)),
+                  ..._buildSubCategoryAggregates(groupKey, items, color),
                 ],
               ),
               crossFadeState: isExpanded
@@ -1069,24 +878,129 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     );
   }
 
-  // 작성자별 색상 매핑
-  static const _ownerColors = [
-    AppColors.teal500,
-    AppColors.purple600,
-    AppColors.blue600,
-    Color(0xFFF59E0B),
-    AppColors.red600,
-  ];
-  final Map<String, Color> _ownerColorMap = {};
+  /// 카테고리 카드 내부: 세부분류별 집계 행 + (펼쳤을 때) 개별 이력
+  List<Widget> _buildSubCategoryAggregates(
+    String parentKey,
+    List<Transaction> items,
+    Color color,
+  ) {
+    final bySub = <String, List<Transaction>>{};
+    for (final tx in items) {
+      bySub.putIfAbsent(tx.subCategory, () => []).add(tx);
+    }
 
-  Color _getOwnerColor(String ownerName) {
-    return _ownerColorMap.putIfAbsent(ownerName, () {
-      return _ownerColors[_ownerColorMap.length % _ownerColors.length];
-    });
+    // 카테고리 이름으로 정의된 세부분류 순서를 추출 (최초 tx 기준)
+    final canonicalSubs =
+        categorySubCategoryMap[items.first.category] ?? const <String>[];
+    final orderedSubs = <String>[
+      ...canonicalSubs.where(bySub.containsKey),
+    ];
+    for (final s in bySub.keys) {
+      if (!orderedSubs.contains(s)) orderedSubs.add(s);
+    }
+
+    final widgets = <Widget>[];
+    for (int i = 0; i < orderedSubs.length; i++) {
+      final sub = orderedSubs[i];
+      final list = bySub[sub]!;
+      final subKey = '${parentKey}_$sub';
+      final subTotal = list.fold<int>(0, (s, t) => s + t.amount);
+      final subExpanded =
+          _expandedSubGroups.contains(subKey) || _isSelectMode;
+
+      widgets.add(_buildSubCategoryAggregateRow(
+        subKey: subKey,
+        subCategory: sub,
+        entries: list,
+        total: subTotal,
+        expanded: subExpanded,
+        color: color,
+      ));
+
+      // 펼친 경우 개별 이력 노출
+      widgets.add(AnimatedCrossFade(
+        firstChild: SizedBox.shrink(),
+        secondChild: Column(
+          children: list.map(_buildEntryRow).toList(),
+        ),
+        crossFadeState: subExpanded
+            ? CrossFadeState.showSecond
+            : CrossFadeState.showFirst,
+        duration: Duration(milliseconds: 200),
+      ));
+
+      if (i < orderedSubs.length - 1) {
+        widgets.add(Divider(height: 1, color: AppColors.gray100));
+      }
+    }
+    return widgets;
   }
 
-  /// 그룹 카드 안에서 표시되는 거래 항목 (라운드 없이 카드 내부 스타일)
-  Widget _buildInlineTransactionItem(Transaction tx) {
+  Widget _buildSubCategoryAggregateRow({
+    required String subKey,
+    required String subCategory,
+    required List<Transaction> entries,
+    required int total,
+    required bool expanded,
+    required Color color,
+  }) {
+    final isIncome = entries.first.type == TransactionType.income;
+    return InkWell(
+      onTap: _isSelectMode
+          ? null
+          : () => setState(() {
+                if (_expandedSubGroups.contains(subKey)) {
+                  _expandedSubGroups.remove(subKey);
+                } else {
+                  _expandedSubGroups.add(subKey);
+                }
+              }),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.cardPadding,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Text(subCategory, style: AppTypography.bodyMedium),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    '${entries.length}건',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.gray500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '${isIncome ? '+' : '-'}${formatKoreanWon(total)}',
+              style: AppTypography.bodyMedium.copyWith(
+                color: isIncome ? AppColors.green600 : AppColors.red600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AnimatedRotation(
+              turns: expanded ? 0.5 : 0,
+              duration: Duration(milliseconds: 200),
+              child: Icon(
+                LucideIcons.chevronDown,
+                size: 16,
+                color: AppColors.gray400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 개별 입력 이력 행 (세부분류 집계 아래에 표시)
+  Widget _buildEntryRow(Transaction tx) {
     final isIncome = tx.type == TransactionType.income;
     final isShared = _sharedTxOwners.containsKey(tx.id);
     final ownerInfo = _sharedTxOwners[tx.id];
@@ -1094,8 +1008,9 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
     final ownerColor = ownerInfo?.color != null
         ? Color(int.parse('FF${ownerInfo!.color!.substring(1)}', radix: 16))
         : (isShared && ownerName != null
-              ? _getOwnerColor(ownerName)
-              : AppColors.teal500);
+            ? _getOwnerColor(ownerName)
+            : AppColors.teal500);
+    final note = tx.note ?? '';
 
     return GestureDetector(
       onTap: _isSelectMode
@@ -1106,25 +1021,33 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
           : () {
               AlConfirmDialog.show(
                 context: context,
-                title: '거래 삭제',
-                message: "'${tx.name}' 항목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                title: '삭제',
+                message:
+                    "'${tx.category} - ${tx.subCategory}' 입력 1건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
                 onConfirm: () async {
                   await ref
                       .read(transactionNotifierProvider(_monthKey).notifier)
                       .deleteTransaction(tx.id);
                   if (mounted) {
-                    showSuccessSnackBar(context, "'${tx.name}' 항목이 삭제되었습니다");
+                    showSuccessSnackBar(context, '삭제되었습니다');
                   }
                 },
               );
             },
       child: Container(
-        decoration: isShared
-            ? BoxDecoration(color: ownerColor.withValues(alpha: 0.04))
-            : null,
-        padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.cardPadding,
-          vertical: AppSpacing.md,
+        decoration: BoxDecoration(
+          color: isShared
+              ? ownerColor.withValues(alpha: 0.04)
+              : AppColors.gray50,
+          border: Border(
+            top: BorderSide(color: AppColors.gray100, width: 0.5),
+          ),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.cardPadding + AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.cardPadding,
+          AppSpacing.sm,
         ),
         child: Row(
           children: [
@@ -1133,76 +1056,69 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                 _selectedIds.contains(tx.id)
                     ? LucideIcons.checkCircle2
                     : LucideIcons.circle,
-                size: 20,
+                size: 18,
                 color: _selectedIds.contains(tx.id)
                     ? AppColors.emerald600
                     : AppColors.gray300,
               ),
               const SizedBox(width: AppSpacing.md),
+            ] else ...[
+              Icon(
+                LucideIcons.cornerDownRight,
+                size: 12,
+                color: AppColors.gray300,
+              ),
+              const SizedBox(width: AppSpacing.sm),
             ],
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    tx.name,
-                    style: AppTypography.bodyMedium,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                  Flexible(
+                    child: Text(
+                      note.isEmpty ? '(비고 없음)' : note,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: note.isEmpty
+                            ? AppColors.gray400
+                            : AppColors.gray700,
+                        fontStyle: note.isEmpty
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      Text(tx.category, style: AppTypography.caption),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        tx.subCategory,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.gray400,
+                  if (isShared && ownerName != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        tx.date.length >= 10
-                            ? tx.date.substring(0, 10)
-                            : tx.date,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.gray400,
+                        decoration: BoxDecoration(
+                          color: ownerColor.withValues(alpha: 0.1),
+                          borderRadius: AppRadius.fullAll,
                         ),
-                      ),
-                      if (isShared && ownerName != null) ...[
-                        const SizedBox(width: AppSpacing.sm),
-                        Flexible(
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ownerColor.withValues(alpha: 0.1),
-                              borderRadius: AppRadius.fullAll,
-                            ),
-                            child: Text(
-                              ownerName,
-                              style: AppTypography.caption.copyWith(
-                                color: ownerColor,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
+                        child: Text(
+                          ownerName,
+                          style: AppTypography.caption.copyWith(
+                            color: ownerColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             Text(
               '${isIncome ? '+' : '-'}${formatKoreanWon(tx.amount)}',
-              style: AppTypography.bodyMedium.copyWith(
+              style: AppTypography.bodySmall.copyWith(
                 color: isIncome ? AppColors.green600 : AppColors.red600,
                 fontWeight: FontWeight.w600,
               ),
