@@ -38,6 +38,10 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   List<Map<String, dynamic>> _myGroups = [];
   bool _groupsLoaded = false;
 
+  // 시트 재진입 방지
+  bool _isAddAssetSheetOpen = false;
+  bool _isEditAssetSheetOpen = false;
+
   String get _monthKey => toMonthKey(_selectedMonth);
 
   void _toggleGroup(String id) {
@@ -64,58 +68,72 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
 
   // ─── 새 자산 추가 Bottom Sheet ──────────────────────────────────────
   void _showAddAssetSheet() async {
-    final groups = ref.read(assetNotifierProvider(_monthKey)).valueOrNull ?? [];
-    List<Map<String, dynamic>> shareGroups = [];
+    if (_isAddAssetSheetOpen) return;
+    _isAddAssetSheetOpen = true;
     try {
-      shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups();
-    } catch (_) { /* 공유 그룹 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
-    if (!mounted) return;
+      final groups =
+          ref.read(assetNotifierProvider(_monthKey)).valueOrNull ?? [];
+      List<Map<String, dynamic>> shareGroups = [];
+      try {
+        shareGroups = await ref.read(shareGroupServiceProvider).getMyGroups();
+      } catch (_) { /* 공유 그룹 로딩 실패 시 무시 — 핵심 기능에 영향 없음 */ }
+      if (!mounted) return;
 
-    AlBottomSheet.show(
-      context: context,
-      title: '새 자산 추가',
-      child: AddAssetForm(
-        assetGroups: groups,
-        shareGroups: shareGroups,
-        onSubmit: ({
-          required String categoryId,
-          required String name,
-          required int value,
-          List<String>? shareGroupIds,
-        }) async {
-          await ref.read(assetNotifierProvider(_monthKey).notifier).addAsset(
-                categoryId: categoryId,
-                name: name,
-                initialValue: value,
-                shareGroupIds: shareGroupIds,
-              );
-          _expandedGroups.add(categoryId);
-          if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
-        },
-      ),
-    );
+      await AlBottomSheet.show(
+        context: context,
+        title: '새 자산 추가',
+        child: AddAssetForm(
+          assetGroups: groups,
+          shareGroups: shareGroups,
+          onSubmit: ({
+            required String categoryId,
+            required String name,
+            required int value,
+            List<String>? shareGroupIds,
+          }) async {
+            await ref.read(assetNotifierProvider(_monthKey).notifier).addAsset(
+                  categoryId: categoryId,
+                  name: name,
+                  initialValue: value,
+                  shareGroupIds: shareGroupIds,
+                );
+            _expandedGroups.add(categoryId);
+            if (mounted) showSuccessSnackBar(context, '자산이 추가되었습니다');
+          },
+        ),
+      );
+    } finally {
+      _isAddAssetSheetOpen = false;
+    }
   }
 
   // ─── 개별 자산 수정 Bottom Sheet ─────────────────────────────────────
-  void _showEditAssetSheet(AssetItem item, AssetGroup group) {
-    AlBottomSheet.show(
-      context: context,
-      title: '자산 수정',
-      child: EditAssetForm(
-        item: item,
-        group: group,
-        onSubmit: ({
-          required String assetId,
-          required String name,
-          required int value,
-        }) async {
-          await ref
-              .read(assetNotifierProvider(_monthKey).notifier)
-              .updateAssetValue(assetId: assetId, month: _monthKey, value: value);
-          if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
-        },
-      ),
-    );
+  void _showEditAssetSheet(AssetItem item, AssetGroup group) async {
+    if (_isEditAssetSheetOpen) return;
+    _isEditAssetSheetOpen = true;
+    try {
+      await AlBottomSheet.show(
+        context: context,
+        title: '자산 수정',
+        child: EditAssetForm(
+          item: item,
+          group: group,
+          onSubmit: ({
+            required String assetId,
+            required String name,
+            required int value,
+          }) async {
+            await ref
+                .read(assetNotifierProvider(_monthKey).notifier)
+                .updateAssetValue(
+                    assetId: assetId, month: _monthKey, value: value);
+            if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
+          },
+        ),
+      );
+    } finally {
+      _isEditAssetSheetOpen = false;
+    }
   }
 
   // ─── 개별 자산 액션 시트 (종료/삭제) ─────────────────────────────────

@@ -9,7 +9,7 @@ class BottomNav extends StatelessWidget {
 
   static final _items = [
     (icon: LucideIcons.home, label: '홈'),
-    (icon: LucideIcons.trendingUp, label: '수입/지출'),
+    (icon: LucideIcons.arrowRightLeft, label: '수입/지출'),
     (icon: LucideIcons.wallet, label: '자산'),
     (icon: LucideIcons.barChart3, label: '리포트'),
     (icon: LucideIcons.menu, label: '더보기'),
@@ -38,10 +38,8 @@ class BottomNav extends StatelessWidget {
                 return Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => navigationShell.goBranch(
-                      index,
-                      initialLocation: true,
-                    ),
+                    onTap: () =>
+                        navigationShell.goBranch(index, initialLocation: true),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -49,18 +47,24 @@ class BottomNav extends StatelessWidget {
                           item.icon,
                           size: 20,
                           color: isActive
-                              ? navTheme.selectedItemColor ?? colorScheme.primary
+                              ? navTheme.selectedItemColor ??
+                                    colorScheme.primary
                               : navTheme.unselectedItemColor,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           item.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight:
-                                isActive ? FontWeight.w500 : FontWeight.normal,
+                            height: 1.0,
+                            fontWeight: isActive
+                                ? FontWeight.w500
+                                : FontWeight.normal,
                             color: isActive
-                                ? navTheme.selectedItemColor ?? colorScheme.primary
+                                ? navTheme.selectedItemColor ??
+                                      colorScheme.primary
                                 : navTheme.unselectedItemColor,
                           ),
                         ),

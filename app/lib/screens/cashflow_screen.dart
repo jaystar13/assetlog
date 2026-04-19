@@ -60,6 +60,11 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   bool _isSelectMode = false;
   final Set<String> _selectedIds = {};
 
+  // 수기 입력 시트 재진입 방지
+  bool _isManualEntrySheetOpen = false;
+  // 거래 수정 시트 재진입 방지
+  bool _isEditEntrySheetOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -165,89 +170,103 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   }
 
   void _showManualEntrySheet() async {
-    List<Map<String, dynamic>> groups = [];
+    if (_isManualEntrySheetOpen) return;
+    _isManualEntrySheetOpen = true;
     try {
-      groups = await ref.read(shareGroupServiceProvider).getMyGroups();
-    } catch (_) {/* ignore */}
-    if (!mounted) return;
+      List<Map<String, dynamic>> groups = [];
+      try {
+        groups = await ref.read(shareGroupServiceProvider).getMyGroups();
+      } catch (_) {/* ignore */}
+      if (!mounted) return;
 
-    AlBottomSheet.show(
-      context: context,
-      title: '수기 입력',
-      child: ManualEntryForm(
-        targetMonth: _monthKey,
-        shareGroups: groups,
-        onSubmit: (entry) async {
-          Navigator.of(context).pop();
-          final shareGroupIds = (entry['shareGroupIds'] as List<String>?) ?? [];
-          try {
-            await ref
-                .read(transactionNotifierProvider(_monthKey).notifier)
-                .addTransaction(
-                  type: entry['type'] as String,
-                  targetMonth: entry['targetMonth'] as String,
-                  category: entry['category'] as String,
-                  subCategory: entry['subCategory'] as String,
-                  amount: entry['amount'] as int,
-                  note: entry['note'] as String?,
-                  shareGroupIds:
-                      shareGroupIds.isNotEmpty ? shareGroupIds : null,
-                );
-            if (mounted) showSuccessSnackBar(context, '저장되었습니다');
-          } catch (e) {
-            if (mounted) showErrorSnackBar(context, '저장 실패: $e');
-          }
-        },
-      ),
-    );
+      await AlBottomSheet.show(
+        context: context,
+        title: '수기 입력',
+        child: ManualEntryForm(
+          targetMonth: _monthKey,
+          shareGroups: groups,
+          onSubmit: (entry) async {
+            Navigator.of(context).pop();
+            final shareGroupIds =
+                (entry['shareGroupIds'] as List<String>?) ?? [];
+            try {
+              await ref
+                  .read(transactionNotifierProvider(_monthKey).notifier)
+                  .addTransaction(
+                    type: entry['type'] as String,
+                    targetMonth: entry['targetMonth'] as String,
+                    category: entry['category'] as String,
+                    subCategory: entry['subCategory'] as String,
+                    amount: entry['amount'] as int,
+                    note: entry['note'] as String?,
+                    shareGroupIds:
+                        shareGroupIds.isNotEmpty ? shareGroupIds : null,
+                  );
+              if (mounted) showSuccessSnackBar(context, '저장되었습니다');
+            } catch (e) {
+              if (mounted) showErrorSnackBar(context, '저장 실패: $e');
+            }
+          },
+        ),
+      );
+    } finally {
+      _isManualEntrySheetOpen = false;
+    }
   }
 
   void _showEditEntrySheet(Transaction tx) async {
-    List<Map<String, dynamic>> groups = [];
-    List<String> currentGroupIds = [];
+    if (_isEditEntrySheetOpen) return;
+    _isEditEntrySheetOpen = true;
     try {
-      final service = ref.read(shareGroupServiceProvider);
-      groups = await service.getMyGroups();
-      currentGroupIds = await service.getItemSharedGroups('transaction', tx.id);
-    } catch (_) {/* ignore */}
-    if (!mounted) return;
+      List<Map<String, dynamic>> groups = [];
+      List<String> currentGroupIds = [];
+      try {
+        final service = ref.read(shareGroupServiceProvider);
+        groups = await service.getMyGroups();
+        currentGroupIds =
+            await service.getItemSharedGroups('transaction', tx.id);
+      } catch (_) {/* ignore */}
+      if (!mounted) return;
 
-    AlBottomSheet.show(
-      context: context,
-      title: '거래 수정',
-      child: ManualEntryForm(
-        targetMonth: tx.targetMonth,
-        initialData: tx.toMap(),
-        shareGroups: groups,
-        initialShareGroupIds: currentGroupIds,
-        onSubmit: (updated) async {
-          Navigator.of(context).pop();
-          try {
-            await ref
-                .read(transactionNotifierProvider(_monthKey).notifier)
-                .updateTransaction(tx.id, {
-              'amount': updated['amount'],
-              'note': updated['note'],
-            });
-            final shareGroupIds =
-                (updated['shareGroupIds'] as List<String>?) ?? [];
-            if (shareGroupIds.isNotEmpty) {
-              try {
-                await ref.read(shareGroupServiceProvider).shareItems(
-                  shareGroupIds.first,
-                  [
-                    {'itemType': 'transaction', 'itemId': tx.id},
-                  ],
-                );
-              } catch (_) {/* ignore */}
+      await AlBottomSheet.show(
+        context: context,
+        title: '거래 수정',
+        child: ManualEntryForm(
+          targetMonth: tx.targetMonth,
+          initialData: tx.toMap(),
+          shareGroups: groups,
+          initialShareGroupIds: currentGroupIds,
+          onSubmit: (updated) async {
+            Navigator.of(context).pop();
+            try {
+              await ref
+                  .read(transactionNotifierProvider(_monthKey).notifier)
+                  .updateTransaction(tx.id, {
+                'amount': updated['amount'],
+                'note': updated['note'],
+              });
+              final shareGroupIds =
+                  (updated['shareGroupIds'] as List<String>?) ?? [];
+              if (shareGroupIds.isNotEmpty) {
+                try {
+                  await ref.read(shareGroupServiceProvider).shareItems(
+                    shareGroupIds.first,
+                    [
+                      {'itemType': 'transaction', 'itemId': tx.id},
+                    ],
+                  );
+                } catch (_) {/* ignore */}
+              }
+              if (mounted) showSuccessSnackBar(context, '수정되었습니다');
+            } catch (e) {
+              if (mounted) showErrorSnackBar(context, '수정 실패: $e');
             }
-            if (mounted) showSuccessSnackBar(context, '수정되었습니다');
-          } catch (e) {
-            if (mounted) showErrorSnackBar(context, '수정 실패: $e');
-          }
-        },
-      ),
-    );
+          },
+        ),
+      );
+    } finally {
+      _isEditEntrySheetOpen = false;
+    }
   }
 
   void _showGroupSelector() {
