@@ -448,13 +448,6 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                     expenseRatio: expenseRatio,
                   ),
                   const SizedBox(height: AppSpacing.sectionGap),
-                  AlButton(
-                    label: '수기 입력',
-                    onPressed: _showManualEntrySheet,
-                    icon:
-                        Icon(LucideIcons.plus, size: 18, color: Colors.white),
-                  ),
-                  const SizedBox(height: AppSpacing.sectionGap),
                   _buildListHeader(filtered),
                   const SizedBox(height: AppSpacing.md),
                   if (filtered.isEmpty)
@@ -483,44 +476,72 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   }
 
   Widget _buildListHeader(List<Transaction> filtered) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text('내역', style: AppTypography.heading3),
-        Row(
-          children: [
-            if (_isSelectMode && filtered.isNotEmpty) ...[
-              GestureDetector(
-                onTap: () => _selectAll(filtered),
-                child: Text(
-                  _selectedIds.length == filtered.length ? '전체 해제' : '전체 선택',
-                  style: AppTypography.bodySmall
-                      .copyWith(color: AppColors.emerald600),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-            ],
-            if (filtered.isNotEmpty)
-              GestureDetector(
-                onTap: () => _toggleSelectMode(
-                  allGroupKeys: _getGroupKeys(filtered),
-                ),
-                child: Text(
-                  _isSelectMode ? '취소' : '선택',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: _isSelectMode
-                        ? AppColors.gray500
-                        : AppColors.emerald600,
+    // 선택/취소 모드 전환 시 오른쪽 필터 pill 유무로 Row 높이가 달라져
+    // '내역' 텍스트가 세로로 미세하게 움직이는 것을 막기 위해 고정 높이 지정.
+    return SizedBox(
+      height: 32,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Text('내역', style: AppTypography.heading3),
+              if (!_isSelectMode) ...[
+                const SizedBox(width: AppSpacing.md),
+                GestureDetector(
+                  onTap: _showManualEntrySheet,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald600,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      LucideIcons.plus,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-            if (!_isSelectMode) ...[
-              const SizedBox(width: AppSpacing.md),
-              _buildTxFilterSegment(),
+              ],
             ],
-          ],
-        ),
-      ],
+          ),
+          Row(
+            children: [
+              if (_isSelectMode && filtered.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () => _selectAll(filtered),
+                  child: Text(
+                    _selectedIds.length == filtered.length ? '전체 해제' : '전체 선택',
+                    style: AppTypography.bodySmall
+                        .copyWith(color: AppColors.emerald600),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+              ],
+              if (filtered.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _toggleSelectMode(
+                    allGroupKeys: _getGroupKeys(filtered),
+                  ),
+                  child: Text(
+                    _isSelectMode ? '취소' : '선택',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: _isSelectMode
+                          ? AppColors.gray500
+                          : AppColors.emerald600,
+                    ),
+                  ),
+                ),
+              if (!_isSelectMode) ...[
+                const SizedBox(width: AppSpacing.md),
+                _buildTxFilterSegment(),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
