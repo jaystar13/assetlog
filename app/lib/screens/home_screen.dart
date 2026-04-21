@@ -122,6 +122,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   // 가장 최근에 로드된 dashboard 데이터 (bottom sheet 등에서 참조용)
   HomeDashboard? _lastDashboard;
 
+  Future<void> _pickGoalDeadline(BuildContext context) async {
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year - 10);
+    final lastDate = DateTime(now.year + 30);
+
+    DateTime initialDate = now;
+    final currentText = _goalDeadlineController.text.trim();
+    if (currentText.isNotEmpty) {
+      final parsed = DateTime.tryParse(currentText);
+      if (parsed != null &&
+          !parsed.isBefore(firstDate) &&
+          !parsed.isAfter(lastDate)) {
+        initialDate = parsed;
+      }
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked == null) return;
+
+    final y = picked.year.toString().padLeft(4, '0');
+    final m = picked.month.toString().padLeft(2, '0');
+    final d = picked.day.toString().padLeft(2, '0');
+    _goalDeadlineController.text = '$y-$m-$d';
+  }
+
   void _showGoalSettingSheet() {
     final goal = _lastDashboard?.goal;
     _goalStartController.text = goal?.startAmount.toString() ?? '';
@@ -162,15 +192,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             inputFormatters: [CurrencyInputFormatter()],
           ),
           const SizedBox(height: AppSpacing.lg),
-          AlInput(
-            label: '목표 기한',
-            placeholder: 'YYYY-MM-DD',
-            prefixIcon: Icon(
-              LucideIcons.calendar,
-              size: 16,
-              color: AppColors.gray500,
+          GestureDetector(
+            onTap: () => _pickGoalDeadline(context),
+            child: AbsorbPointer(
+              child: AlInput(
+                label: '목표 기한',
+                placeholder: 'YYYY-MM-DD',
+                prefixIcon: Icon(
+                  LucideIcons.calendar,
+                  size: 16,
+                  color: AppColors.gray500,
+                ),
+                controller: _goalDeadlineController,
+              ),
             ),
-            controller: _goalDeadlineController,
           ),
           const SizedBox(height: AppSpacing.xl),
           AlAsyncButton(
