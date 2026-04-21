@@ -89,11 +89,13 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             required String categoryId,
             required String name,
             required int value,
+            String? note,
             List<String>? shareGroupIds,
           }) async {
             await ref.read(assetNotifierProvider(_monthKey).notifier).addAsset(
                   categoryId: categoryId,
                   name: name,
+                  note: note,
                   initialValue: value,
                   shareGroupIds: shareGroupIds,
                 );
@@ -122,11 +124,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
             required String assetId,
             required String name,
             required int value,
+            String? note,
           }) async {
-            await ref
-                .read(assetNotifierProvider(_monthKey).notifier)
-                .updateAssetValue(
-                    assetId: assetId, month: _monthKey, value: value);
+            final notifier =
+                ref.read(assetNotifierProvider(_monthKey).notifier);
+            await notifier.updateAssetValue(
+                assetId: assetId, month: _monthKey, value: value);
+            await notifier.updateAssetMeta(
+              assetId: assetId,
+              name: name != item.name ? name : null,
+              note: (note ?? '') != (item.note ?? '') ? (note ?? '') : null,
+            );
             if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
           },
         ),
@@ -765,6 +773,17 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
                       color: AppColors.gray900,
                     ),
                   ),
+                  if (item.note != null && item.note!.isNotEmpty) ...[
+                    SizedBox(height: 2),
+                    Text(
+                      item.note!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
                   SizedBox(height: 2),
                   Row(
                     children: [

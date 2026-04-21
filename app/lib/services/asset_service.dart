@@ -28,6 +28,7 @@ class AssetService with ApiResponseUnwrapper {
   Future<Map<String, dynamic>> createAsset({
     required String categoryId,
     required String name,
+    String? note,
     List<String>? shareGroupIds,
   }) async {
     try {
@@ -36,6 +37,7 @@ class AssetService with ApiResponseUnwrapper {
         data: {
           'categoryId': categoryId,
           'name': name,
+          'note': ?note,
           'shareGroupIds': ?shareGroupIds,
         },
       );

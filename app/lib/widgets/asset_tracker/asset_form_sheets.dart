@@ -19,6 +19,7 @@ class AddAssetForm extends StatefulWidget {
     required String categoryId,
     required String name,
     required int value,
+    String? note,
     List<String>? shareGroupIds,
   }) onSubmit;
 
@@ -37,6 +38,7 @@ class _AddAssetFormState extends State<AddAssetForm> {
   late String _selectedGroup;
   final _nameController = TextEditingController();
   final _valueController = TextEditingController();
+  final _noteController = TextEditingController();
   final _selectedShareGroupIds = <String>{};
 
   @override
@@ -51,6 +53,7 @@ class _AddAssetFormState extends State<AddAssetForm> {
   void dispose() {
     _nameController.dispose();
     _valueController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -109,6 +112,15 @@ class _AddAssetFormState extends State<AddAssetForm> {
           keyboardType: TextInputType.number,
           inputFormatters: [CurrencyInputFormatter()],
           prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+
+        AlInput(
+          label: '비고 (선택)',
+          placeholder: '메모를 입력하세요',
+          controller: _noteController,
+          maxLines: 3,
+          prefixIcon: Icon(LucideIcons.stickyNote, size: 16, color: AppColors.gray500),
         ),
 
         // 공유 그룹 선택
@@ -192,6 +204,7 @@ class _AddAssetFormState extends State<AddAssetForm> {
 
     final isDebt = _selectedGroup == 'loans';
     final actualValue = isDebt ? -value.abs() : value;
+    final note = _noteController.text.trim();
 
     Navigator.of(context).pop();
 
@@ -199,6 +212,7 @@ class _AddAssetFormState extends State<AddAssetForm> {
       categoryId: _selectedGroup,
       name: name,
       value: actualValue,
+      note: note.isEmpty ? null : note,
       shareGroupIds: _selectedShareGroupIds.isNotEmpty
           ? _selectedShareGroupIds.toList()
           : null,
@@ -214,6 +228,7 @@ class EditAssetForm extends StatefulWidget {
     required String assetId,
     required String name,
     required int value,
+    String? note,
   }) onSubmit;
 
   const EditAssetForm({
@@ -230,6 +245,7 @@ class EditAssetForm extends StatefulWidget {
 class _EditAssetFormState extends State<EditAssetForm> {
   late final TextEditingController _nameController;
   late final TextEditingController _valueController;
+  late final TextEditingController _noteController;
 
   @override
   void initState() {
@@ -238,12 +254,14 @@ class _EditAssetFormState extends State<EditAssetForm> {
     _valueController = TextEditingController(
       text: widget.item.currentValue.abs().toString(),
     );
+    _noteController = TextEditingController(text: widget.item.note ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _valueController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -287,6 +305,15 @@ class _EditAssetFormState extends State<EditAssetForm> {
           inputFormatters: [CurrencyInputFormatter()],
           prefixIcon: Icon(LucideIcons.banknote, size: 16, color: AppColors.gray500),
         ),
+        const SizedBox(height: AppSpacing.lg),
+
+        AlInput(
+          label: '비고 (선택)',
+          placeholder: '메모를 입력하세요',
+          controller: _noteController,
+          maxLines: 3,
+          prefixIcon: Icon(LucideIcons.stickyNote, size: 16, color: AppColors.gray500),
+        ),
         const SizedBox(height: AppSpacing.xl),
 
         AlButton(
@@ -319,6 +346,7 @@ class _EditAssetFormState extends State<EditAssetForm> {
 
     final isDebt = widget.group.id == 'loans';
     final actualValue = isDebt ? -value.abs().toInt() : value.toInt();
+    final note = _noteController.text.trim();
 
     Navigator.of(context).pop();
 
@@ -326,6 +354,7 @@ class _EditAssetFormState extends State<EditAssetForm> {
       assetId: widget.item.id,
       name: name,
       value: actualValue,
+      note: note,
     );
   }
 }

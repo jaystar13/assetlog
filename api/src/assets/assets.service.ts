@@ -35,6 +35,7 @@ export class AssetsService {
         userId,
         categoryId: dto.categoryId,
         name: dto.name,
+        note: dto.note ?? null,
       },
     });
 
@@ -64,6 +65,7 @@ export class AssetsService {
       data: {
         ...(dto.categoryId && { categoryId: dto.categoryId }),
         ...(dto.name && { name: dto.name }),
+        ...(dto.note !== undefined && { note: dto.note }),
       },
     });
   }

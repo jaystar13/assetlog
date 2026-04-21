@@ -56,6 +56,7 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
       final item = AssetItem(
         id: assetId,
         name: raw['name'] as String,
+        note: raw['note'] as String?,
         currentValue: latestValue,
         previousValue: prevValueById[assetId] ?? 0,
         lastUpdated: history.isNotEmpty
@@ -81,11 +82,17 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
   Future<void> addAsset({
     required String categoryId,
     required String name,
+    String? note,
     int? initialValue,
     List<String>? shareGroupIds,
   }) async {
     final service = ref.read(assetServiceProvider);
-    final created = await service.createAsset(categoryId: categoryId, name: name, shareGroupIds: shareGroupIds);
+    final created = await service.createAsset(
+      categoryId: categoryId,
+      name: name,
+      note: note,
+      shareGroupIds: shareGroupIds,
+    );
     final assetId = created['id'] as String;
     final currentMonth = arg; // family parameter = YYYY-MM
 
@@ -103,6 +110,20 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
   }) async {
     final service = ref.read(assetServiceProvider);
     await service.upsertHistory(assetId: assetId, month: month, value: value);
+    _invalidateAll();
+  }
+
+  Future<void> updateAssetMeta({
+    required String assetId,
+    String? name,
+    String? note,
+  }) async {
+    final service = ref.read(assetServiceProvider);
+    final data = <String, dynamic>{};
+    if (name != null) data['name'] = name;
+    if (note != null) data['note'] = note.isEmpty ? null : note;
+    if (data.isEmpty) return;
+    await service.updateAsset(assetId, data);
     _invalidateAll();
   }
 
