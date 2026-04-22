@@ -213,13 +213,14 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
         final padding = maxVal == minVal ? maxVal.abs() * 0.1 + 1 : (maxVal - minVal) * 0.15;
         final minY = minVal - padding;
         final maxY = maxVal + padding;
+        final yRange = maxY - minY;
 
         return _chartCard(
           title: '순자산 추이',
           chart: LineChart(
             LineChartData(
-              minX: 0,
-              maxX: (months.length - 1).toDouble(),
+              minX: -0.3,
+              maxX: (months.length - 1).toDouble() + 0.3,
               minY: minY,
               maxY: maxY,
               clipData: FlClipData.all(),
@@ -247,7 +248,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   sideTitles: SideTitles(
                     showTitles: true,
                     reservedSize: 52,
-                    getTitlesWidget: (value, meta) => Text(formatChartWon(value), style: AppTypography.caption),
+                    getTitlesWidget: (value, meta) => Text(formatChartWon(value, range: yRange), style: AppTypography.caption),
                   ),
                 ),
               ),
@@ -256,7 +257,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   getTooltipColor: (_) => AppColors.gray800,
                   getTooltipItems: (spots) => spots.map((s) {
                     return LineTooltipItem(
-                      formatChartWon(s.y),
+                      formatChartWon(s.y, range: yRange),
                       TextStyle(color: Colors.white, fontSize: 12),
                     );
                   }).toList(),
