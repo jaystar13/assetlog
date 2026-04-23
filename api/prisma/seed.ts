@@ -6,23 +6,6 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // ─── Card Companies (9개) ──────────────────────────────────────────
-  await prisma.cardCompany.deleteMany();
-  await prisma.cardCompany.createMany({
-    data: [
-      { name: '신한카드', format: 'Excel(.xls)', enabled: true },
-      { name: 'KB국민카드', format: 'Excel(.xlsx)', enabled: true },
-      { name: '현대카드', format: 'Excel(.xlsx)', enabled: false },
-      { name: '삼성카드', format: 'Excel(.xls)', enabled: false },
-      { name: '롯데카드', format: 'CSV', enabled: false },
-      { name: '하나카드', format: 'Excel(.xls)', enabled: false },
-      { name: 'NH농협카드', format: 'Excel(.xlsx)', enabled: false },
-      { name: '우리카드', format: 'Excel(.xls)', enabled: false },
-      { name: 'BC카드', format: 'CSV', enabled: false },
-    ],
-  });
-  console.log('✓ Card companies seeded (9)');
-
   // ─── Daily Quotes (31개) ───────────────────────────────────────────
   await prisma.dailyQuote.deleteMany();
   await prisma.dailyQuote.createMany({

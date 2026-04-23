@@ -227,15 +227,6 @@ model WithdrawalLog {
 
 // ─── Seed Tables ─────────────────────────────────────────────────────────────
 
-model CardCompany {
-  id      String  @id @default(uuid())
-  name    String
-  format  String
-  enabled Boolean @default(false)
-
-  @@map("card_companies")
-}
-
 model DailyQuote {
   id     String @id @default(uuid())
   text   String

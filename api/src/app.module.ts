@@ -6,7 +6,6 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AssetsModule } from './assets/assets.module';
 import { TransactionsModule } from './transactions/transactions.module';
-import { CardCompaniesModule } from './card-companies/card-companies.module';
 import { ShareGroupsModule } from './share-groups/share-groups.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { HealthModule } from './health/health.module';
@@ -20,7 +19,6 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     UsersModule,
     AssetsModule,
     TransactionsModule,
-    CardCompaniesModule,
     ShareGroupsModule,
     QuotesModule,
     HealthModule,
