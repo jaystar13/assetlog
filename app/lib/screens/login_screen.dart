@@ -29,6 +29,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final result = await FlutterWebAuth2.authenticate(
         url: '${Env.apiBaseUrl}/auth/$provider',
         callbackUrlScheme: 'assetlog',
+        options: const FlutterWebAuth2Options(
+          // Android: 콜백 수신 시 Custom Tabs 가 자동으로 닫히도록 함
+          // (FLAG_ACTIVITY_NO_HISTORY 포함)
+          intentFlags: ephemeralIntentFlags,
+        ),
       );
 
       final uri = Uri.parse(result);
@@ -102,20 +107,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenPadding,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenPadding,
+              ),
+              child: Column(
+                children: [
+                  const Spacer(flex: 3),
+                  _buildLogo(),
+                  const Spacer(flex: 2),
+                  _buildSocialButtons(),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildFooter(),
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
+              ),
+            ),
           ),
+          if (_isLoading) _buildLoadingOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: AppColors.background,
+        child: Center(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Spacer(flex: 3),
-              _buildLogo(),
-              const Spacer(flex: 2),
-              _buildSocialButtons(),
-              const SizedBox(height: AppSpacing.xl),
-              _buildFooter(),
-              const SizedBox(height: AppSpacing.xxl),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.emerald600),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                '로그인 중...',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.gray600,
+                ),
+              ),
             ],
           ),
         ),
