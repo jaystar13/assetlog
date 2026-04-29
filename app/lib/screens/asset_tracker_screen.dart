@@ -28,7 +28,8 @@ class AssetTrackerScreen extends ConsumerStatefulWidget {
   ConsumerState<AssetTrackerScreen> createState() => _AssetTrackerScreenState();
 }
 
-class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
+class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen>
+    with WidgetsBindingObserver {
   DateTime _selectedMonth = DateTime.now();
   final Set<String> _expandedGroups = {};
 
@@ -41,6 +42,71 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   // 시트 재진입 방지
   bool _isAddAssetSheetOpen = false;
   bool _isEditAssetSheetOpen = false;
+
+  // 공유 데이터 자동 새로고침: 마지막 갱신 시각 + post-frame 스케줄 가드
+  DateTime? _lastRefreshAt;
+  bool _refreshScheduled = false;
+  static const Duration _staleThreshold = Duration(seconds: 30);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _markRefreshed();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // 앱이 백그라운드에서 다시 포그라운드로 돌아올 때 강제 새로고침
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshNow();
+    }
+  }
+
+  void _markRefreshed() {
+    _lastRefreshAt = DateTime.now();
+  }
+
+  bool get _isStale {
+    if (_lastRefreshAt == null) return true;
+    return DateTime.now().difference(_lastRefreshAt!) > _staleThreshold;
+  }
+
+  /// 화면 진입 또는 build 호출 시점에 stale 이면 자동 새로고침.
+  void _scheduleStaleRefresh() {
+    if (_refreshScheduled) return;
+    if (!_isStale) return;
+    _refreshScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshScheduled = false;
+      if (!mounted) return;
+      _refreshNow();
+    });
+  }
+
+  /// 본인/그룹 자산 데이터 모두 무효화 후 재로드.
+  void _refreshNow() {
+    if (!mounted) return;
+    _markRefreshed();
+    ref.invalidate(assetNotifierProvider(_monthKey));
+    if (_isGroupMode) {
+      // 공유 자산은 캐시키 초기화로 다음 빌드에서 재로딩되도록 함
+      _lastAssetGroupKey = null;
+      _loadSharedAssets();
+    }
+  }
+
+  /// Pull-to-refresh 핸들러.
+  Future<void> _handlePullRefresh() async {
+    _refreshNow();
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
 
   String get _monthKey => toMonthKey(_selectedMonth);
 
@@ -334,6 +400,8 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
   @override
   Widget build(BuildContext context) {
     _loadGroups();
+    // 화면 진입(탭 전환 후 build 재호출 포함) 시 stale 데이터 자동 갱신
+    _scheduleStaleRefresh();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -460,38 +528,43 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen> {
               ],
             ),
           ),
-          data: (groups) => SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: AppSpacing.screenPadding,
-              right: AppSpacing.screenPadding,
-              bottom: AppSpacing.bottomNavSafeArea,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: AppSpacing.lg),
-                AssetPieChartCard(groups: groups),
-                const SizedBox(height: AppSpacing.sectionGap),
-                ...groups.map((group) {
-                  // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
-                  final sharedInCategory = _isGroupMode
-                      ? _sharedAssets
-                            .where((a) => a['categoryId'] == group.id)
-                            .toList()
-                      : <Map<String, dynamic>>[];
-                  return Padding(
-                    key: ValueKey(group.id),
-                    padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                    child: _buildAssetGroupCard(
-                      group,
-                      sharedAssets: sharedInCategory,
-                    ),
-                  );
-                }),
-                const SizedBox(height: AppSpacing.lg),
-                _buildAddAssetButton(),
-                const SizedBox(height: AppSpacing.sectionGap),
-              ],
+          data: (groups) => RefreshIndicator(
+            onRefresh: _handlePullRefresh,
+            color: AppColors.emerald600,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(
+                left: AppSpacing.screenPadding,
+                right: AppSpacing.screenPadding,
+                bottom: AppSpacing.bottomNavSafeArea,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.lg),
+                  AssetPieChartCard(groups: groups),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  ...groups.map((group) {
+                    // 그룹 모드일 때 해당 카테고리의 공유 자산을 합침
+                    final sharedInCategory = _isGroupMode
+                        ? _sharedAssets
+                              .where((a) => a['categoryId'] == group.id)
+                              .toList()
+                        : <Map<String, dynamic>>[];
+                    return Padding(
+                      key: ValueKey(group.id),
+                      padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                      child: _buildAssetGroupCard(
+                        group,
+                        sharedAssets: sharedInCategory,
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildAddAssetButton(),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                ],
+              ),
             ),
           ),
         );
