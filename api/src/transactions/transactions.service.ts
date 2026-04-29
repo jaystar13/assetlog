@@ -14,8 +14,8 @@ export class TransactionsService {
 
   // ─────────────────────── 목록 조회 ───────────────────────
 
-  findAll(userId: string, query: QueryTransactionDto) {
-    return this.prisma.transaction.findMany({
+  async findAll(userId: string, query: QueryTransactionDto) {
+    const transactions = await this.prisma.transaction.findMany({
       where: {
         userId,
         ...(query.type ? { type: query.type } : {}),
@@ -23,6 +23,26 @@ export class TransactionsService {
       },
       orderBy: [{ targetMonth: 'desc' }, { type: 'asc' }, { category: 'asc' }],
     });
+
+    if (transactions.length === 0) return transactions;
+
+    // 각 거래가 어느 그룹에 공유되어 있는지 한 번에 조회 (목록 화면에 공유 표시용)
+    const txIds = transactions.map((t) => t.id);
+    const shares = await this.prisma.sharedItem.findMany({
+      where: { ownerUserId: userId, itemType: 'transaction', itemId: { in: txIds } },
+      select: { itemId: true, groupId: true },
+    });
+    const sharesByItem = new Map<string, string[]>();
+    for (const s of shares) {
+      const arr = sharesByItem.get(s.itemId) ?? [];
+      arr.push(s.groupId);
+      sharesByItem.set(s.itemId, arr);
+    }
+
+    return transactions.map((tx) => ({
+      ...tx,
+      shareGroupIds: sharesByItem.get(tx.id) ?? [],
+    }));
   }
 
   // ─────────────────────── 생성 (누적) ───────────────────────

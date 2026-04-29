@@ -6,6 +6,7 @@ class AssetItem {
   final num previousValue;
   final String lastUpdated;
   final String? editedBy;
+  final List<String> shareGroupIds;
 
   const AssetItem({
     required this.id,
@@ -15,6 +16,7 @@ class AssetItem {
     required this.previousValue,
     required this.lastUpdated,
     this.editedBy,
+    this.shareGroupIds = const [],
   });
 
   num get change => currentValue - previousValue;
@@ -24,6 +26,8 @@ class AssetItem {
     return ((currentValue - previousValue) / previousValue.abs()) * 100;
   }
 
+  bool get isShared => shareGroupIds.isNotEmpty;
+
   AssetItem copyWith({
     String? id,
     String? name,
@@ -32,6 +36,7 @@ class AssetItem {
     num? previousValue,
     String? lastUpdated,
     String? editedBy,
+    List<String>? shareGroupIds,
   }) {
     return AssetItem(
       id: id ?? this.id,
@@ -41,6 +46,7 @@ class AssetItem {
       previousValue: previousValue ?? this.previousValue,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       editedBy: editedBy ?? this.editedBy,
+      shareGroupIds: shareGroupIds ?? this.shareGroupIds,
     );
   }
 
@@ -52,6 +58,7 @@ class AssetItem {
         'previousValue': previousValue,
         'lastUpdated': lastUpdated,
         'editedBy': editedBy,
+        'shareGroupIds': shareGroupIds,
       };
 
   factory AssetItem.fromJson(Map<String, dynamic> json) => AssetItem(
@@ -62,5 +69,7 @@ class AssetItem {
         previousValue: json['previousValue'] as num,
         lastUpdated: json['lastUpdated'] as String,
         editedBy: json['editedBy'] as String?,
+        shareGroupIds:
+            ((json['shareGroupIds'] as List?)?.cast<String>()) ?? const [],
       );
 }

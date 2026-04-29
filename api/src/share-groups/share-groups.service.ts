@@ -307,6 +307,87 @@ export class ShareGroupsService {
     await this.prisma.sharedItem.delete({ where: { id: sharedItemId } });
   }
 
+  /**
+   * 본인 소유 항목(transaction/asset)이 공유될 그룹 목록을 한 번에 동기화한다.
+   * 현재 SharedItem 상태와 새 groupIds 를 diff 하여 add/remove 를 모두 처리.
+   * 빈 groupIds 를 넘기면 해당 항목의 공유가 모두 해제된다.
+   */
+  async syncItemShares(
+    userId: string,
+    itemType: string,
+    itemId: string,
+    groupIds: string[],
+  ) {
+    // 1) 항목 소유권 검증
+    if (itemType === 'transaction') {
+      const owned = await this.prisma.transaction.findUnique({
+        where: { id: itemId },
+        select: { userId: true },
+      });
+      if (!owned) throw new NotFoundException('거래를 찾을 수 없습니다.');
+      if (owned.userId !== userId) {
+        throw new ForbiddenException('본인의 거래만 공유 설정할 수 있습니다.');
+      }
+    } else if (itemType === 'asset') {
+      const owned = await this.prisma.asset.findUnique({
+        where: { id: itemId },
+        select: { userId: true },
+      });
+      if (!owned) throw new NotFoundException('자산을 찾을 수 없습니다.');
+      if (owned.userId !== userId) {
+        throw new ForbiddenException('본인의 자산만 공유 설정할 수 있습니다.');
+      }
+    }
+
+    // 2) 추가될 그룹들에 대한 멤버십 검증 (소속이 아닌 그룹에는 공유 불가)
+    if (groupIds.length > 0) {
+      const memberships = await this.prisma.shareGroupMember.findMany({
+        where: { userId, groupId: { in: groupIds } },
+        select: { groupId: true },
+      });
+      const memberOfSet = new Set(memberships.map((m) => m.groupId));
+      const notMember = groupIds.filter((g) => !memberOfSet.has(g));
+      if (notMember.length > 0) {
+        throw new ForbiddenException('소속되지 않은 그룹에는 공유할 수 없습니다.');
+      }
+    }
+
+    // 3) 현재 공유 상태 조회 (본인 소유분만)
+    const current = await this.prisma.sharedItem.findMany({
+      where: { ownerUserId: userId, itemType, itemId },
+      select: { id: true, groupId: true },
+    });
+    const currentGroupSet = new Set(current.map((c) => c.groupId));
+    const targetGroupSet = new Set(groupIds);
+
+    const toAdd = groupIds.filter((g) => !currentGroupSet.has(g));
+    const toRemoveIds = current
+      .filter((c) => !targetGroupSet.has(c.groupId))
+      .map((c) => c.id);
+
+    // 4) 트랜잭션으로 add/remove 동시 처리
+    await this.prisma.$transaction([
+      ...(toRemoveIds.length > 0
+        ? [this.prisma.sharedItem.deleteMany({ where: { id: { in: toRemoveIds } } })]
+        : []),
+      ...(toAdd.length > 0
+        ? [
+            this.prisma.sharedItem.createMany({
+              data: toAdd.map((groupId) => ({
+                groupId,
+                ownerUserId: userId,
+                itemType,
+                itemId,
+              })),
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+    ]);
+
+    return { added: toAdd.length, removed: toRemoveIds.length, groupIds };
+  }
+
   // ─────────────────────── 공유 데이터 조회 ───────────────────────
 
   async getItemSharedGroups(userId: string, itemType: string, itemId: string) {

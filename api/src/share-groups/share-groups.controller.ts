@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Param,
@@ -15,6 +16,7 @@ import { ShareGroupsService } from './share-groups.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { InviteToGroupDto } from './dto/invite-to-group.dto';
 import { ShareItemsDto } from './dto/share-items.dto';
+import { SyncItemSharesDto } from './dto/sync-item-shares.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -145,6 +147,18 @@ export class ShareGroupsController {
     @Param('itemId') itemId: string,
   ) {
     return this.service.unshareItem(userId, id, itemId);
+  }
+
+  @Put('items/sync')
+  @ApiOperation({
+    summary:
+      '항목의 공유 그룹 동기화 (현재 상태와 비교해 추가/삭제를 한 번에 처리)',
+  })
+  syncItemShares(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SyncItemSharesDto,
+  ) {
+    return this.service.syncItemShares(userId, dto.itemType, dto.itemId, dto.groupIds);
   }
 
   // ─── 공유 데이터 조회 ──────────────────────────

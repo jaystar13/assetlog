@@ -62,6 +62,8 @@ class AssetNotifier extends AutoDisposeFamilyAsyncNotifier<List<AssetGroup>, Str
         lastUpdated: history.isNotEmpty
             ? history.first['month'] as String
             : '',
+        shareGroupIds:
+            ((raw['shareGroupIds'] as List?)?.cast<String>()) ?? const [],
       );
 
       grouped.putIfAbsent(categoryId, () => []).add(item);

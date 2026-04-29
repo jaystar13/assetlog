@@ -306,18 +306,16 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen>
                 'amount': updated['amount'],
                 'note': updated['note'],
               });
+              // 공유 그룹 동기화 (현재 상태와 비교해 추가/삭제 자동 처리)
               final shareGroupIds =
                   (updated['shareGroupIds'] as List<String>?) ?? [];
-              if (shareGroupIds.isNotEmpty) {
-                try {
-                  await ref.read(shareGroupServiceProvider).shareItems(
-                    shareGroupIds.first,
-                    [
-                      {'itemType': 'transaction', 'itemId': tx.id},
-                    ],
-                  );
-                } catch (_) {/* ignore */}
-              }
+              try {
+                await ref.read(shareGroupServiceProvider).setItemSharedGroups(
+                      itemType: 'transaction',
+                      itemId: tx.id,
+                      groupIds: shareGroupIds,
+                    );
+              } catch (_) { /* 공유 동기화 실패는 핵심 수정에 영향 없음 */ }
               if (mounted) showSuccessSnackBar(context, '수정되었습니다');
             } catch (e) {
               if (mounted) showErrorSnackBar(context, '수정 실패: $e');
@@ -1222,9 +1220,19 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen>
                       ),
                     ),
                   ],
+                  // 본인 거래의 공유 여부 표시 (비고 옆) — 남의 거래는 위 owner chip 으로 식별
+                  if (!isShared && tx.isShared) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Icon(
+                      LucideIcons.users,
+                      size: 12,
+                      color: AppColors.gray400,
+                    ),
+                  ],
                 ],
               ),
             ),
+            const SizedBox(width: AppSpacing.sm),
             Text(
               '${isIncome ? '+' : '-'}${formatKoreanWon(tx.amount)}',
               style: AppTypography.bodySmall.copyWith(

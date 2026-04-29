@@ -180,17 +180,31 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen>
     if (_isEditAssetSheetOpen) return;
     _isEditAssetSheetOpen = true;
     try {
+      // 공유 그룹 목록 + 현재 공유 상태 조회 (실패해도 진행 — 핵심 수정은 동작)
+      List<Map<String, dynamic>> shareGroups = [];
+      List<String> currentShareGroupIds = [];
+      try {
+        final service = ref.read(shareGroupServiceProvider);
+        shareGroups = await service.getMyGroups();
+        currentShareGroupIds =
+            await service.getItemSharedGroups('asset', item.id);
+      } catch (_) { /* 공유 정보 로딩 실패 시 무시 */ }
+      if (!mounted) return;
+
       await AlBottomSheet.show(
         context: context,
         title: '자산 수정',
         child: EditAssetForm(
           item: item,
           group: group,
+          shareGroups: shareGroups,
+          initialShareGroupIds: currentShareGroupIds,
           onSubmit: ({
             required String assetId,
             required String name,
             required int value,
             String? note,
+            required List<String> shareGroupIds,
           }) async {
             final notifier =
                 ref.read(assetNotifierProvider(_monthKey).notifier);
@@ -201,6 +215,14 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen>
               name: name != item.name ? name : null,
               note: (note ?? '') != (item.note ?? '') ? (note ?? '') : null,
             );
+            // 공유 그룹 동기화 (현재 상태와 비교해 추가/삭제 자동 처리)
+            try {
+              await ref.read(shareGroupServiceProvider).setItemSharedGroups(
+                    itemType: 'asset',
+                    itemId: assetId,
+                    groupIds: shareGroupIds,
+                  );
+            } catch (_) { /* 공유 동기화 실패는 핵심 수정에 영향 없음 */ }
             if (mounted) showSuccessSnackBar(context, '자산이 수정되었습니다');
           },
         ),
@@ -840,11 +862,27 @@ class _AssetTrackerScreenState extends ConsumerState<AssetTrackerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.name,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.gray900,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.name,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.gray900,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // 공유 여부 미니 아이콘 (본인 자산이 한 그룹 이상에 공유 중일 때)
+                      if (item.isShared) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        Icon(
+                          LucideIcons.users,
+                          size: 12,
+                          color: AppColors.gray400,
+                        ),
+                      ],
+                    ],
                   ),
                   if (item.note != null && item.note!.isNotEmpty) ...[
                     SizedBox(height: 2),

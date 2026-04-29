@@ -224,17 +224,22 @@ class _AddAssetFormState extends State<AddAssetForm> {
 class EditAssetForm extends StatefulWidget {
   final AssetItem item;
   final AssetGroup group;
+  final List<Map<String, dynamic>> shareGroups;
+  final List<String> initialShareGroupIds;
   final Future<void> Function({
     required String assetId,
     required String name,
     required int value,
     String? note,
+    required List<String> shareGroupIds,
   }) onSubmit;
 
   const EditAssetForm({
     super.key,
     required this.item,
     required this.group,
+    this.shareGroups = const [],
+    this.initialShareGroupIds = const [],
     required this.onSubmit,
   });
 
@@ -246,6 +251,7 @@ class _EditAssetFormState extends State<EditAssetForm> {
   late final TextEditingController _nameController;
   late final TextEditingController _valueController;
   late final TextEditingController _noteController;
+  late final Set<String> _selectedShareGroupIds;
 
   @override
   void initState() {
@@ -255,6 +261,7 @@ class _EditAssetFormState extends State<EditAssetForm> {
       text: widget.item.currentValue.abs().toString(),
     );
     _noteController = TextEditingController(text: widget.item.note ?? '');
+    _selectedShareGroupIds = widget.initialShareGroupIds.toSet();
   }
 
   @override
@@ -314,6 +321,14 @@ class _EditAssetFormState extends State<EditAssetForm> {
           maxLines: 3,
           prefixIcon: Icon(LucideIcons.stickyNote, size: 16, color: AppColors.gray500),
         ),
+
+        // 공유 그룹 선택 (있을 때만 표시)
+        if (widget.shareGroups.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xl),
+          Text('공유 그룹', style: AppTypography.label),
+          const SizedBox(height: AppSpacing.sm),
+          _buildShareGroupChips(),
+        ],
         const SizedBox(height: AppSpacing.xl),
 
         AlButton(
@@ -322,6 +337,48 @@ class _EditAssetFormState extends State<EditAssetForm> {
           onPressed: _submit,
         ),
       ],
+    );
+  }
+
+  Widget _buildShareGroupChips() {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: widget.shareGroups.map((g) {
+        final gId = g['id'] as String;
+        final gName = g['name'] as String;
+        final sel = _selectedShareGroupIds.contains(gId);
+        return GestureDetector(
+          onTap: () => setState(() {
+            sel ? _selectedShareGroupIds.remove(gId) : _selectedShareGroupIds.add(gId);
+          }),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: sel ? AppColors.emerald50 : AppColors.gray50,
+              borderRadius: AppRadius.fullAll,
+              border: Border.all(color: sel ? AppColors.emerald500 : AppColors.gray200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  sel ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                  size: 14,
+                  color: sel ? AppColors.emerald600 : AppColors.gray400,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  gName,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: sel ? AppColors.emerald700 : AppColors.gray600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -355,6 +412,7 @@ class _EditAssetFormState extends State<EditAssetForm> {
       name: name,
       value: actualValue,
       note: note,
+      shareGroupIds: _selectedShareGroupIds.toList(),
     );
   }
 }

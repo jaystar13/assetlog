@@ -8,6 +8,7 @@ class Transaction {
   final String subCategory;
   final int amount;
   final String? note;
+  final List<String> shareGroupIds;
 
   const Transaction({
     required this.id,
@@ -17,7 +18,10 @@ class Transaction {
     required this.subCategory,
     required this.amount,
     this.note,
+    this.shareGroupIds = const [],
   });
+
+  bool get isShared => shareGroupIds.isNotEmpty;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -27,6 +31,7 @@ class Transaction {
         'subCategory': subCategory,
         'amount': amount,
         'note': note,
+        'shareGroupIds': shareGroupIds,
       };
 
   factory Transaction.fromMap(Map<String, dynamic> map) => Transaction(
@@ -37,5 +42,7 @@ class Transaction {
         subCategory: (map['subCategory'] ?? map['sub_category']) as String,
         amount: (map['amount'] as num).toInt(),
         note: map['note'] as String?,
+        shareGroupIds:
+            ((map['shareGroupIds'] as List?)?.cast<String>()) ?? const [],
       );
 }

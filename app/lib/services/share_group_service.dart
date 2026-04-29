@@ -152,6 +152,27 @@ class ShareGroupService with ApiResponseUnwrapper {
     }
   }
 
+  /// 특정 항목의 공유 그룹을 한 번에 동기화한다.
+  /// [groupIds] 가 빈 배열이면 모든 공유가 해제된다.
+  Future<void> setItemSharedGroups({
+    required String itemType,
+    required String itemId,
+    required List<String> groupIds,
+  }) async {
+    try {
+      await _dio.put(
+        '/share-groups/items/sync',
+        data: {
+          'itemType': itemType,
+          'itemId': itemId,
+          'groupIds': groupIds,
+        },
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   // ─── 활동 이력 ─────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getActivityLogs(String groupId) async {

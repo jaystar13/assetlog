@@ -10,8 +10,8 @@ export class AssetsService {
 
   // ─────────────────────── 목록 조회 ───────────────────────
 
-  findAll(userId: string, status?: string, month?: string) {
-    return this.prisma.asset.findMany({
+  async findAll(userId: string, status?: string, month?: string) {
+    const assets = await this.prisma.asset.findMany({
       where: {
         userId,
         ...(status ? { status } : { status: 'active' }),
@@ -25,6 +25,26 @@ export class AssetsService {
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    if (assets.length === 0) return assets;
+
+    // 각 자산이 어느 그룹에 공유되어 있는지 한 번에 조회 (목록 화면에 공유 표시용)
+    const assetIds = assets.map((a) => a.id);
+    const shares = await this.prisma.sharedItem.findMany({
+      where: { ownerUserId: userId, itemType: 'asset', itemId: { in: assetIds } },
+      select: { itemId: true, groupId: true },
+    });
+    const sharesByItem = new Map<string, string[]>();
+    for (const s of shares) {
+      const arr = sharesByItem.get(s.itemId) ?? [];
+      arr.push(s.groupId);
+      sharesByItem.set(s.itemId, arr);
+    }
+
+    return assets.map((a) => ({
+      ...a,
+      shareGroupIds: sharesByItem.get(a.id) ?? [],
+    }));
   }
 
   // ─────────────────────── 생성 ───────────────────────
