@@ -401,9 +401,10 @@ export class ShareGroupsService {
   async getGroupTransactions(userId: string, groupId: string, month?: string) {
     await this.assertMember(userId, groupId);
 
+    // 본인이 공유한 거래는 자기 거래 목록에 이미 존재하므로 제외
     const sharedItems = await this.prisma.sharedItem.findMany({
-      where: { groupId, itemType: 'transaction' },
-      select: { itemId: true, ownerUserId: true },
+      where: { groupId, itemType: 'transaction', ownerUserId: { not: userId } },
+      select: { itemId: true },
     });
 
     if (sharedItems.length === 0) return [];
@@ -437,9 +438,10 @@ export class ShareGroupsService {
   async getGroupAssets(userId: string, groupId: string, month?: string) {
     await this.assertMember(userId, groupId);
 
+    // 본인이 공유한 자산은 자기 자산 목록에 이미 존재하므로 제외
     const sharedItems = await this.prisma.sharedItem.findMany({
-      where: { groupId, itemType: 'asset' },
-      select: { itemId: true, ownerUserId: true },
+      where: { groupId, itemType: 'asset', ownerUserId: { not: userId } },
+      select: { itemId: true },
     });
 
     if (sharedItems.length === 0) return [];
